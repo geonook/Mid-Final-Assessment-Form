@@ -279,9 +279,13 @@ function replacePlaceholders(body, classData) {
       value = '';
     }
 
+    // 跳脫正則表達式特殊字元（大括號）
+    // replaceText() 使用正則表達式，需要將 { 和 } 跳脫為 \{ 和 \}
+    const escapedPlaceholder = placeholder.replace(/[{}]/g, '\\$&');
+
     // 在整個文件中搜尋並替換（支援表格和段落）
     try {
-      body.replaceText(placeholder, value);
+      body.replaceText(escapedPlaceholder, value);
       console.log(`  替換 ${placeholder} → ${value}`);
     } catch (e) {
       console.warn(`  ⚠️ 替換 ${placeholder} 時發生錯誤: ${e.message}`);
