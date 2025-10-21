@@ -1,11 +1,13 @@
 /**
- * 2526 Fall Midterm 班級報告生成器
- * 簡化版：專注於核心功能 - 填充模板的學生名單表格
+ * 2526 Fall Midterm v2 班級報告生成器
+ * 功能升級：佔位符替換 + GradeBand 子資料夾分類
  *
  * 功能：
- * - 從 Google Sheets 讀取學生和班級資料
+ * - 從 Google Sheets 讀取學生和班級資料（含完整考試資訊）
  * - 複製 A4 橫式模板（2 頁：考試指導 + 班級報告）
- * - 填充右側學生名單表格（6 欄，按學號排序）
+ * - 第一頁：替換所有佔位符 {{...}} 為對應資料
+ * - 第二頁：填充學生名單表格（6 欄，按學號排序）
+ * - 依 GradeBand 分類儲存到子資料夾
  * - 生成獨立的班級報告檔案
  */
 
@@ -30,10 +32,28 @@ const CONFIG = {
   },
 
   // 檔案命名
-  semester: '2526_Fall_Midterm',
+  semester: '2526_Fall_Midterm_v2',
 
   // 批次處理設定
-  delayMs: 1000  // 每個檔案間延遲（毫秒）
+  delayMs: 1000,  // 每個檔案間延遲（毫秒）
+
+  // 佔位符欄位映射（Class 工作表欄位 → 模板佔位符）
+  placeholderFields: [
+    'GradeBand',    // {{GradeBand}} - 年級段
+    'Duration',     // {{Duration}} - 考試時長
+    'Periods',      // {{Periods}} - 節次
+    'Self-Study',   // {{Self-Study}} - 自習時間
+    'Preparation',  // {{Preparation}} - 準備時間
+    'ExamTime',     // {{ExamTime}} - 考試時間
+    'Level',        // {{Level}} - 等級
+    'Classroom',    // {{Classroom}} - 教室
+    'Proctor',      // {{Proctor}} - 監考教師
+    'Subject',      // {{Subject}} - 科目
+    'ClassName',    // {{ClassName}} - 班級名稱
+    'Teacher',      // {{Teacher}} - 授課教師
+    'Count',        // {{Count}} - 試卷總數
+    'Students'      // {{Students}} - 總學生數
+  ]
 };
 
 // ============================================
@@ -70,28 +90,44 @@ function generateClassReports() {
     const errors = [];
 
     for (let i = 1; i < classData.length; i++) {
+      // 建立完整的班級資料物件（包含所有新欄位）
+      const classRow = classData[i];
       const classInfo = {
-        name: classData[i][classIndexes.ClassName],
-        teacher: classData[i][classIndexes.Tea]
+        ClassName: classRow[classIndexes.ClassName],
+        Grade: classRow[classIndexes.Grade],
+        Teacher: classRow[classIndexes.Teacher],
+        Level: classRow[classIndexes.Level],
+        Classroom: classRow[classIndexes.Classroom],
+        GradeBand: classRow[classIndexes.GradeBand],
+        Duration: classRow[classIndexes.Duration],
+        Periods: classRow[classIndexes.Periods],
+        'Self-Study': classRow[classIndexes['Self-Study']],
+        Preparation: classRow[classIndexes.Preparation],
+        ExamTime: classRow[classIndexes.ExamTime],
+        Proctor: classRow[classIndexes.Proctor],
+        Subject: classRow[classIndexes.Subject],
+        Count: classRow[classIndexes.Count],
+        Students: classRow[classIndexes.Students]
       };
 
-      if (!classInfo.name) continue;
+      if (!classInfo.ClassName) continue;
 
-      const students = groupedStudents[classInfo.name];
+      const students = groupedStudents[classInfo.ClassName];
       if (!students || students.length === 0) {
-        console.warn(`班級 ${classInfo.name} 沒有學生資料`);
-        errors.push(`${classInfo.name}-${classInfo.teacher} (無學生資料)`);
+        console.warn(`班級 ${classInfo.ClassName} 沒有學生資料`);
+        errors.push(`${classInfo.ClassName}-${classInfo.Teacher} (無學生資料)`);
         continue;
       }
 
       try {
         const progress = Math.round((i / (classData.length - 1)) * 100);
-        console.log(`處理 ${classInfo.name} (${classInfo.teacher})... [${i}/${classData.length - 1}] (${progress}%)`);
+        console.log(`處理 ${classInfo.ClassName} (${classInfo.Teacher})... [${i}/${classData.length - 1}] (${progress}%)`);
 
         const file = generateSingleReport(classInfo, students, studentIndexes);
         results.push({
-          name: classInfo.name,
-          teacher: classInfo.teacher,
+          name: classInfo.ClassName,
+          teacher: classInfo.Teacher,
+          gradeBand: classInfo.GradeBand,
           url: file.getUrl()
         });
 
@@ -101,8 +137,8 @@ function generateClassReports() {
         }
 
       } catch (e) {
-        console.error(`${classInfo.name} 生成失敗: ${e.message}`);
-        errors.push(`${classInfo.name}-${classInfo.teacher} (${e.message})`);
+        console.error(`${classInfo.ClassName} 生成失敗: ${e.message}`);
+        errors.push(`${classInfo.ClassName}-${classInfo.Teacher} (${e.message})`);
       }
     }
 
@@ -117,22 +153,33 @@ function generateClassReports() {
 
 /**
  * 生成單一班級報告
+ * v2: 支援佔位符替換 + GradeBand 子資料夾
+ *
+ * @param {Object} classData - 完整的班級資料物件（包含所有欄位）
+ * @param {Array} students - 該班級的學生陣列
+ * @param {Object} studentIndexes - 學生欄位索引
+ * @return {File} 生成的檔案物件
  */
-function generateSingleReport(classInfo, students, studentIndexes) {
+function generateSingleReport(classData, students, studentIndexes) {
+  // 取得或建立 GradeBand 子資料夾
+  const targetFolder = getOrCreateSubfolder(CONFIG.outputFolderId, classData.GradeBand);
+
   // 複製模板
   const template = DriveApp.getFileById(CONFIG.templateId);
-  const folder = DriveApp.getFolderById(CONFIG.outputFolderId);
-
   const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss");
-  const fileName = `${classInfo.name}_${classInfo.teacher}_${CONFIG.semester}_${timestamp}`;
-  const newFile = template.makeCopy(fileName, folder);
+  const fileName = `${classData.ClassName}_${classData.Teacher}_${CONFIG.semester}_${timestamp}`;
+  const newFile = template.makeCopy(fileName, targetFolder);
 
   console.log(`模板複製完成: ${fileName}`);
 
-  // 開啟文件並填充學生表格
+  // 開啟文件
   const doc = DocumentApp.openById(newFile.getId());
   const body = doc.getBody();
 
+  // 步驟 1: 替換佔位符（第一頁）
+  replacePlaceholders(body, classData);
+
+  // 步驟 2: 填充學生表格（第二頁）
   fillStudentTable(body, students, studentIndexes);
 
   doc.saveAndClose();
@@ -214,6 +261,70 @@ function fillStudentTable(body, students, studentIndexes) {
 // ============================================
 
 /**
+ * 替換文件中的所有佔位符
+ * 搜尋並替換所有 {{FieldName}} 格式的佔位符
+ *
+ * @param {Body} body - Google Docs 文件主體
+ * @param {Object} classData - 班級資料物件（包含所有欄位）
+ */
+function replacePlaceholders(body, classData) {
+  console.log('開始替換佔位符...');
+
+  CONFIG.placeholderFields.forEach(field => {
+    const placeholder = `{{${field}}}`;
+    let value = String(classData[field] || '');
+
+    // 確保值不為 undefined 或 null
+    if (value === 'undefined' || value === 'null') {
+      value = '';
+    }
+
+    // 在整個文件中搜尋並替換（支援表格和段落）
+    try {
+      body.replaceText(placeholder, value);
+      console.log(`  替換 ${placeholder} → ${value}`);
+    } catch (e) {
+      console.warn(`  ⚠️ 替換 ${placeholder} 時發生錯誤: ${e.message}`);
+    }
+  });
+
+  console.log('佔位符替換完成');
+}
+
+/**
+ * 取得或建立 GradeBand 子資料夾
+ * 清理 GradeBand 名稱中的特殊字元（空格 → 底線，移除撇號）
+ *
+ * @param {String} parentFolderId - 父資料夾 ID
+ * @param {String} gradeBand - GradeBand 值（例如：G3 IT's）
+ * @return {Folder} 子資料夾物件
+ */
+function getOrCreateSubfolder(parentFolderId, gradeBand) {
+  const parentFolder = DriveApp.getFolderById(parentFolderId);
+
+  // 清理 GradeBand 名稱：空格 → 底線，移除撇號和其他特殊字元
+  const cleanFolderName = String(gradeBand)
+    .replace(/\s+/g, '_')      // 空格 → 底線
+    .replace(/['''`]/g, '')    // 移除撇號
+    .replace(/[^\w\-]/g, '_'); // 其他特殊字元 → 底線
+
+  console.log(`  檢查子資料夾: ${cleanFolderName}`);
+
+  // 檢查子資料夾是否已存在
+  const folders = parentFolder.getFoldersByName(cleanFolderName);
+
+  if (folders.hasNext()) {
+    const folder = folders.next();
+    console.log(`  ✓ 使用現有子資料夾: ${cleanFolderName}`);
+    return folder;
+  } else {
+    const newFolder = parentFolder.createFolder(cleanFolderName);
+    console.log(`  ✓ 建立新子資料夾: ${cleanFolderName}`);
+    return newFolder;
+  }
+}
+
+/**
  * 格式化表格行
  */
 function formatTableRow(row, fontSize, isHeader = false) {
@@ -274,13 +385,37 @@ function getStudentIndexes(headers) {
 
 /**
  * 取得班級欄位索引
+ * v2: 擴充支援完整考試資訊欄位
  */
 function getClassIndexes(headers) {
-  const fields = ["ClassName", "Tea"];
+  const fields = [
+    "ClassName",     // 班級名稱
+    "Grade",         // 年級
+    "Teacher",       // 授課教師（原 Tea 欄位，保持向後相容）
+    "Level",         // 等級
+    "Classroom",     // 教室
+    "GradeBand",     // 年級段
+    "Duration",      // 考試時長
+    "Periods",       // 節次
+    "Self-Study",    // 自習時間
+    "Preparation",   // 準備時間
+    "ExamTime",      // 考試時間
+    "Proctor",       // 監考教師
+    "Subject",       // 科目
+    "Count",         // 試卷總數
+    "Students"       // 總學生數
+  ];
+
   const indexes = {};
 
   fields.forEach(field => {
-    const index = headers.indexOf(field);
+    let index = headers.indexOf(field);
+
+    // 向後相容：Tea 欄位可能被改名為 Teacher
+    if (field === "Teacher" && index === -1) {
+      index = headers.indexOf("Tea");
+    }
+
     if (index === -1) {
       throw new Error(`Class 工作表缺少欄位: ${field}`);
     }
@@ -311,9 +446,10 @@ function groupStudentsByClass(studentsData, indexes) {
 
 /**
  * 格式化結果報告
+ * v2: 新增 GradeBand 分類顯示
  */
 function formatResults(results, errors) {
-  let message = `✅ 班級報告生成完成！\n\n`;
+  let message = `✅ 班級報告生成完成！(v2)\n\n`;
   message += `📊 成功: ${results.length} 個班級\n`;
 
   if (errors.length > 0) {
@@ -321,11 +457,26 @@ function formatResults(results, errors) {
   }
 
   if (results.length > 0) {
-    message += `\n📁 生成的檔案：\n`;
-    results.forEach((item, i) => {
-      message += `${i + 1}. ${item.name} (${item.teacher})\n`;
+    message += `\n📁 生成的檔案（依 GradeBand 分類）：\n`;
+
+    // 依 GradeBand 分組顯示
+    const groupedByGradeBand = {};
+    results.forEach(item => {
+      const gb = item.gradeBand || 'Unknown';
+      if (!groupedByGradeBand[gb]) {
+        groupedByGradeBand[gb] = [];
+      }
+      groupedByGradeBand[gb].push(item);
     });
-    message += `\n🔗 資料夾: https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`;
+
+    Object.keys(groupedByGradeBand).sort().forEach(gradeBand => {
+      message += `\n  📂 ${gradeBand}:\n`;
+      groupedByGradeBand[gradeBand].forEach(item => {
+        message += `    • ${item.name} (${item.teacher})\n`;
+      });
+    });
+
+    message += `\n🔗 主資料夾: https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`;
   }
 
   if (errors.length > 0) {
@@ -348,8 +499,8 @@ function formatResults(results, errors) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('班級報告')
-    .addItem('生成 2526 Fall Midterm 報告', 'runReportGeneration')
-    .addItem('🧪 測試單一班級', 'testSingleClass')
+    .addItem('生成 2526 Fall Midterm v2 報告', 'runReportGeneration')
+    .addItem('🧪 測試單一班級（v2）', 'testSingleClass')
     .addToUi();
 }
 
@@ -368,7 +519,7 @@ function runReportGeneration() {
 
 /**
  * 測試模式：只生成第一個班級的報告
- * 用於快速測試和驗證功能
+ * v2: 支援完整資料結構和佔位符替換測試
  */
 function testSingleClass() {
   try {
@@ -393,20 +544,35 @@ function testSingleClass() {
       throw new Error('Class 工作表沒有資料');
     }
 
+    // 建立完整的班級資料物件
+    const classRow = classData[1];
     const classInfo = {
-      name: classData[1][classIndexes.ClassName],
-      teacher: classData[1][classIndexes.Tea]
+      ClassName: classRow[classIndexes.ClassName],
+      Grade: classRow[classIndexes.Grade],
+      Teacher: classRow[classIndexes.Teacher],
+      Level: classRow[classIndexes.Level],
+      Classroom: classRow[classIndexes.Classroom],
+      GradeBand: classRow[classIndexes.GradeBand],
+      Duration: classRow[classIndexes.Duration],
+      Periods: classRow[classIndexes.Periods],
+      'Self-Study': classRow[classIndexes['Self-Study']],
+      Preparation: classRow[classIndexes.Preparation],
+      ExamTime: classRow[classIndexes.ExamTime],
+      Proctor: classRow[classIndexes.Proctor],
+      Subject: classRow[classIndexes.Subject],
+      Count: classRow[classIndexes.Count],
+      Students: classRow[classIndexes.Students]
     };
 
-    const students = groupedStudents[classInfo.name];
+    const students = groupedStudents[classInfo.ClassName];
     if (!students || students.length === 0) {
-      throw new Error(`班級 ${classInfo.name} 沒有學生資料`);
+      throw new Error(`班級 ${classInfo.ClassName} 沒有學生資料`);
     }
 
-    console.log(`🧪 測試模式：生成 ${classInfo.name} (${classInfo.teacher}) 的報告`);
+    console.log(`🧪 測試模式 v2：生成 ${classInfo.ClassName} (${classInfo.Teacher}) 的報告`);
     const file = generateSingleReport(classInfo, students, studentIndexes);
 
-    const message = `✅ 測試成功！\n\n班級: ${classInfo.name}\n老師: ${classInfo.teacher}\n學生數: ${students.length}\n\n🔗 查看檔案:\n${file.getUrl()}`;
+    const message = `✅ 測試成功！(v2)\n\n班級: ${classInfo.ClassName}\n老師: ${classInfo.Teacher}\nGradeBand: ${classInfo.GradeBand}\n學生數: ${students.length}\n\n🔗 查看檔案:\n${file.getUrl()}`;
     SpreadsheetApp.getUi().alert(message);
 
   } catch (e) {
