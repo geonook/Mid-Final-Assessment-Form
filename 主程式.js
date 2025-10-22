@@ -16,6 +16,9 @@
 // ============================================
 
 const CONFIG = {
+  // Google Sheets 試算表 ID（用於 Apps Script 編輯器直接執行）
+  spreadsheetId: '1bo3xsXw0u8Wwbo6ALvPe9idKDVCjhtAVKAKfH8azhJE',
+
   // Google Drive 資源 ID
   templateId: '1D2hSZNI8MQzD_OIeCdEvpqp4EWfO2mrjTCHAQZyx6MM',
   outputFolderId: '1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi',
@@ -582,5 +585,129 @@ function testSingleClass() {
   } catch (e) {
     SpreadsheetApp.getUi().alert(`❌ 測試失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
     console.error('測試錯誤:', e);
+  }
+}
+
+// ============================================
+// Apps Script 編輯器直接執行函數
+// ============================================
+
+/**
+ * 🚀 快速測試入口 - 在 Apps Script 編輯器直接執行
+ *
+ * 使用方法：
+ * 1. 打開 Apps Script 編輯器
+ * 2. 在頂部函數選擇器選擇「RUN」
+ * 3. 點擊「執行」按鈕 ▶
+ * 4. 查看執行日誌（View → Logs 或 Ctrl+Enter / Cmd+Enter）
+ *
+ * 功能：
+ * - 使用 CONFIG.spreadsheetId 讀取試算表資料
+ * - 生成第一個班級的報告（快速測試用）
+ * - 驗證佔位符替換、學生名單填入、GradeBand 子資料夾等功能
+ *
+ * 執行結果會顯示在日誌中，包含：
+ * - 班級資訊
+ * - 生成的檔案連結
+ * - 儲存位置
+ */
+function RUN() {
+  try {
+    console.log('========================================');
+    console.log('🚀 RUN() - Apps Script 編輯器測試模式');
+    console.log('========================================');
+
+    // 使用 CONFIG 中的試算表 ID
+    console.log(`📊 讀取試算表: ${CONFIG.spreadsheetId}`);
+    const spreadsheet = SpreadsheetApp.openById(CONFIG.spreadsheetId);
+    const studentsSheet = spreadsheet.getSheetByName('Students');
+    const classSheet = spreadsheet.getSheetByName('Class');
+
+    if (!studentsSheet || !classSheet) {
+      throw new Error('找不到 Students 或 Class 工作表');
+    }
+
+    // 讀取資料
+    const studentsData = studentsSheet.getDataRange().getValues();
+    const classData = classSheet.getDataRange().getValues();
+
+    console.log(`✓ Students 工作表: ${studentsData.length - 1} 筆學生資料`);
+    console.log(`✓ Class 工作表: ${classData.length - 1} 個班級`);
+
+    // 處理索引
+    const studentIndexes = getStudentIndexes(studentsData[0]);
+    const classIndexes = getClassIndexes(classData[0]);
+    const groupedStudents = groupStudentsByClass(studentsData, studentIndexes);
+
+    // 只處理第一個班級
+    if (classData.length < 2) {
+      throw new Error('Class 工作表沒有資料');
+    }
+
+    const classRow = classData[1];
+    const classInfo = {
+      ClassName: classRow[classIndexes.ClassName],
+      Grade: classRow[classIndexes.Grade],
+      Teacher: classRow[classIndexes.Teacher],
+      Level: classRow[classIndexes.Level],
+      Classroom: classRow[classIndexes.Classroom],
+      GradeBand: classRow[classIndexes.GradeBand],
+      Duration: classRow[classIndexes.Duration],
+      Periods: classRow[classIndexes.Periods],
+      'Self-Study': classRow[classIndexes['Self-Study']],
+      Preparation: classRow[classIndexes.Preparation],
+      ExamTime: classRow[classIndexes.ExamTime],
+      Proctor: classRow[classIndexes.Proctor],
+      Subject: classRow[classIndexes.Subject],
+      Count: classRow[classIndexes.Count],
+      Students: classRow[classIndexes.Students]
+    };
+
+    const students = groupedStudents[classInfo.ClassName];
+
+    if (!students || students.length === 0) {
+      throw new Error(`班級 ${classInfo.ClassName} 沒有學生資料`);
+    }
+
+    console.log('');
+    console.log('📋 班級資訊:');
+    console.log(`  班級: ${classInfo.ClassName}`);
+    console.log(`  老師: ${classInfo.Teacher}`);
+    console.log(`  GradeBand: ${classInfo.GradeBand}`);
+    console.log(`  等級: ${classInfo.Level}`);
+    console.log(`  教室: ${classInfo.Classroom}`);
+    console.log(`  科目: ${classInfo.Subject}`);
+    console.log(`  監考教師: ${classInfo.Proctor}`);
+    console.log(`  學生數: ${students.length}`);
+    console.log('');
+
+    console.log('🔄 開始生成報告...');
+
+    // 生成報告
+    const file = generateSingleReport(classInfo, students, studentIndexes);
+
+    console.log('');
+    console.log('========================================');
+    console.log('✅ 測試完成！');
+    console.log('========================================');
+    console.log(`📄 檔案名稱: ${file.getName()}`);
+    console.log(`🔗 檔案連結: ${file.getUrl()}`);
+    console.log(`📂 儲存位置: 輸出資料夾/${classInfo.GradeBand}/`);
+    console.log('');
+    console.log('💡 提示: 請開啟檔案檢查：');
+    console.log('   • 第一頁的 {{...}} 佔位符是否都被正確替換');
+    console.log('   • 第二頁的學生名單是否正確填入');
+    console.log('   • 檔案是否儲存在正確的 GradeBand 子資料夾');
+    console.log('========================================');
+
+  } catch (e) {
+    console.error('');
+    console.error('========================================');
+    console.error('❌ 執行失敗');
+    console.error('========================================');
+    console.error(`錯誤訊息: ${e.message}`);
+    console.error(`錯誤堆疊: ${e.stack}`);
+    console.error('========================================');
+    throw e;
   }
 }
