@@ -340,6 +340,12 @@ function formatTableRow(row, fontSize, isHeader = false) {
 
     // 對齊方式
     cell.setVerticalAlignment(DocumentApp.VerticalAlignment.CENTER);
+
+    // 確保 cell 有段落元素（如果是空的，先創建一個）
+    if (cell.getNumChildren() === 0) {
+      cell.appendParagraph('');
+    }
+
     const para = cell.getChild(0).asParagraph();
     para.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     para.setLineSpacing(1.0);
