@@ -24,7 +24,7 @@ const CONFIG = {
   outputFolderId: '1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi',
 
   // 表格設定
-  studentTableIndex: 1,  // 學生名單表格（右側）
+  studentTableIndex: 2,  // 學生名單表格（第三個表格，tables[2]）
   columnWidths: [90, 100, 140, 140, 80, 120],  // 6 欄寬度
 
   // 字體大小設定（根據學生人數）
@@ -230,6 +230,13 @@ function fillStudentTable(body, students, studentIndexes) {
   sortedStudents.forEach(student => {
     const row = studentTable.appendTableRow();
 
+    // 初始化所有 6 個 cells（確保有 paragraph 元素）
+    for (let i = 0; i < 6; i++) {
+      if (row.getCell(i).getNumChildren() === 0) {
+        row.getCell(i).appendParagraph('');
+      }
+    }
+
     // 填入 6 欄資料
     row.getCell(0).setText(String(student[studentIndexes.ID] || ''));
     row.getCell(1).setText(String(student[studentIndexes["Home Room"]] || ''));
@@ -265,7 +272,8 @@ function fillStudentTable(body, students, studentIndexes) {
 
 /**
  * 替換文件中的所有佔位符
- * 搜尋並替換所有 {{FieldName}} 格式的佔位符
+ * 使用 findText() 搜尋並替換所有 {{FieldName}} 格式的佔位符
+ * 支援有格式的文字（如黃色背景標記）
  *
  * @param {Body} body - Google Docs 文件主體
  * @param {Object} classData - 班級資料物件（包含所有欄位）
@@ -283,13 +291,35 @@ function replacePlaceholders(body, classData) {
     }
 
     // 跳脫正則表達式特殊字元（大括號）
-    // replaceText() 使用正則表達式，需要將 { 和 } 跳脫為 \{ 和 \}
-    const escapedPlaceholder = placeholder.replace(/[{}]/g, '\\$&');
+    const pattern = '\\{\\{' + field + '\\}\\}';
 
-    // 在整個文件中搜尋並替換（支援表格和段落）
     try {
-      body.replaceText(escapedPlaceholder, value);
-      console.log(`  替換 ${placeholder} → ${value}`);
+      let searchResult = body.findText(pattern);
+      let replacedCount = 0;
+
+      // 逐一找到所有匹配的佔位符並替換
+      while (searchResult !== null) {
+        const foundElement = searchResult.getElement();
+        const start = searchResult.getStartOffset();
+        const end = searchResult.getEndOffsetInclusive();
+
+        // 刪除找到的佔位符文字，並插入替換值
+        const textElement = foundElement.asText();
+        textElement.deleteText(start, end);
+        textElement.insertText(start, value);
+
+        replacedCount++;
+
+        // 繼續搜尋下一個匹配項
+        searchResult = body.findText(pattern, searchResult);
+      }
+
+      if (replacedCount > 0) {
+        console.log(`  替換 ${placeholder} → ${value} (${replacedCount} 處)`);
+      } else {
+        console.log(`  未找到 ${placeholder}`);
+      }
+
     } catch (e) {
       console.warn(`  ⚠️ 替換 ${placeholder} 時發生錯誤: ${e.message}`);
     }
@@ -591,6 +621,90 @@ function testSingleClass() {
   } catch (e) {
     SpreadsheetApp.getUi().alert(`❌ 測試失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
     console.error('測試錯誤:', e);
+  }
+}
+
+// ============================================
+// 模板分析工具
+// ============================================
+
+/**
+ * 分析模板結構 - 檢查表格數量和位置
+ * 用於診斷 studentTableIndex 設定
+ */
+function ANALYZE_TEMPLATE() {
+  try {
+    console.log('========================================');
+    console.log('🔍 模板結構分析');
+    console.log('========================================');
+
+    const doc = DocumentApp.openById(CONFIG.templateId);
+    const body = doc.getBody();
+    const tables = body.getTables();
+
+    console.log(`\n📊 表格總數: ${tables.length}\n`);
+
+    tables.forEach((table, index) => {
+      console.log(`--- 表格 ${index} (tables[${index}]) ---`);
+      console.log(`  行數: ${table.getNumRows()}`);
+
+      const firstRow = table.getRow(0);
+      console.log(`  欄數: ${firstRow.getNumCells()}`);
+
+      // 讀取第一行內容
+      const headers = [];
+      for (let col = 0; col < Math.min(firstRow.getNumCells(), 6); col++) {
+        const text = firstRow.getCell(col).getText().trim();
+        headers.push(text.substring(0, 20)); // 只顯示前20字元
+      }
+      console.log(`  第一行: ${headers.join(' | ')}`);
+
+      // 讀取第一列（左側）的內容（前5行）
+      const leftColumn = [];
+      for (let row = 0; row < Math.min(table.getNumRows(), 5); row++) {
+        const text = table.getRow(row).getCell(0).getText().trim();
+        leftColumn.push(text.substring(0, 30));
+      }
+      console.log(`  第一列內容:\n    ${leftColumn.join('\n    ')}`);
+      console.log('');
+    });
+
+    console.log('========================================');
+    console.log('💡 判斷建議:');
+    console.log('========================================');
+
+    // 尋找學生表格
+    let studentTableFound = false;
+    tables.forEach((table, index) => {
+      const firstRow = table.getRow(0);
+      const firstCell = firstRow.getCell(0).getText().trim();
+      const numCols = firstRow.getNumCells();
+
+      if (firstCell.includes('Student') || firstCell.includes('ID') || numCols === 6) {
+        console.log(`✅ 表格 ${index} 可能是學生表格:`);
+        if (firstCell.includes('Student') || firstCell.includes('ID')) {
+          console.log(`   - 第一格包含 "Student" 或 "ID"`);
+        }
+        if (numCols === 6) {
+          console.log(`   - 有 6 欄（符合學生表格結構）`);
+        }
+        console.log(`   → 建議設定: CONFIG.studentTableIndex = ${index}`);
+        console.log('');
+        studentTableFound = true;
+      }
+    });
+
+    if (!studentTableFound) {
+      console.log('⚠️ 無法自動識別學生表格，請手動檢查');
+    }
+
+    console.log('========================================');
+    console.log(`\n目前設定: CONFIG.studentTableIndex = ${CONFIG.studentTableIndex}`);
+    console.log('========================================');
+
+  } catch (e) {
+    console.error('❌ 分析失敗:', e.message);
+    console.error(e.stack);
   }
 }
 
