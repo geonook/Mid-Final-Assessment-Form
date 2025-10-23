@@ -176,23 +176,24 @@ function generateSingleReport(classData, students, studentIndexes) {
   console.log(`模板複製完成: ${fileName}`);
 
   // ============================================
-  // 階段 1: 替換佔位符（第一頁）
+  // 階段 1: 填充學生表格（第二頁）- 先執行
+  // 此時文件結構完好，表格操作不會失敗
   // ============================================
   let doc = DocumentApp.openById(newFile.getId());
   let body = doc.getBody();
-  replacePlaceholders(body, classData);
+  fillStudentTable(body, students, studentIndexes);
   doc.saveAndClose();
-  console.log(`階段 1 完成：佔位符替換完成`);
+  console.log(`階段 1 完成：學生表格填充完成`);
 
   // ============================================
-  // 階段 2: 填充學生表格（第二頁）
-  // 重新打開文件以刷新內部結構
+  // 階段 2: 替換佔位符（第一頁）- 後執行
+  // 即使破壞文件結構，學生表格已完成不受影響
   // ============================================
   doc = DocumentApp.openById(newFile.getId());
   body = doc.getBody();
-  fillStudentTable(body, students, studentIndexes);
+  replacePlaceholders(body, classData);
   doc.saveAndClose();
-  console.log(`階段 2 完成：學生表格填充完成`);
+  console.log(`階段 2 完成：佔位符替換完成`);
 
   console.log(`報告生成完成: ${fileName}`);
   return newFile;
