@@ -1121,7 +1121,9 @@ function getOrCreateMergedFolder(parentFolder) {
 }
 
 /**
- * 將多個 Google Docs 合併為單一 Google Docs
+ * 將多個 Google Docs 合併為單一 Google Docs（整份文件複製方式）
+ * 使用 DriveApp.makeCopy() 複製第一個文件作為基底，保留完整版面配置
+ * 再將其餘文件逐一附加，確保版面格式不跑版
  * @param {Array} docsList - Google Docs File 物件陣列
  * @param {String} gradeBandName - GradeBand 名稱（資料夾名稱，例如 "G1_LTs"）
  * @param {String} originalGradeBand - 原始 GradeBand 名稱（例如 "G1 LT's"）
@@ -1129,45 +1131,35 @@ function getOrCreateMergedFolder(parentFolder) {
  * @return {File} 生成的 Google Docs File 物件
  */
 function mergeDocsToGoogleDocs(docsList, gradeBandName, originalGradeBand, mergedFolder) {
-  console.log(`  開始合併 ${docsList.length} 個文件...`);
+  console.log(`  開始合併 ${docsList.length} 個文件（整份文件複製方式）...`);
 
-  // 1. 創建臨時合併文件
-  const mergedDoc = DocumentApp.create(`${gradeBandName}_Merged_Temp`);
-  const mergedBody = mergedDoc.getBody();
-
-  // 2. 清空預設內容
-  mergedBody.clear();
-
-  // 2a. 複製第一個文件的頁面設定（確保 A4 橫式）
-  if (docsList.length > 0) {
-    try {
-      const firstDoc = DocumentApp.openById(docsList[0].getId());
-      const firstBody = firstDoc.getBody();
-
-      // 複製頁面尺寸和邊距
-      mergedBody.setPageWidth(firstBody.getPageWidth());
-      mergedBody.setPageHeight(firstBody.getPageHeight());
-      mergedBody.setMarginTop(firstBody.getMarginTop());
-      mergedBody.setMarginBottom(firstBody.getMarginBottom());
-      mergedBody.setMarginLeft(firstBody.getMarginLeft());
-      mergedBody.setMarginRight(firstBody.getMarginRight());
-
-      console.log(`  頁面設定: ${firstBody.getPageWidth()} x ${firstBody.getPageHeight()} pt (寬 x 高)`);
-    } catch (e) {
-      console.warn(`  ⚠️ 無法複製頁面設定: ${e.message}，使用預設設定`);
-    }
+  if (docsList.length === 0) {
+    throw new Error('文件清單為空，無法合併');
   }
 
-  // 3. 遍歷每個 Docs，複製內容
-  docsList.forEach((file, index) => {
-    console.log(`    複製 ${index + 1}/${docsList.length}: ${file.getName()}`);
+  // 1. 直接複製第一個文件作為合併文件的基底（保留完整版面配置）
+  console.log(`  複製第一個文件作為基底: ${docsList[0].getName()}`);
+  const firstDocFile = DriveApp.getFileById(docsList[0].getId());
+  const mergedDocFile = firstDocFile.makeCopy(`${gradeBandName}_Merged_Temp`, mergedFolder);
+  const mergedDoc = DocumentApp.openById(mergedDocFile.getId());
+  const mergedBody = mergedDoc.getBody();
+
+  console.log(`  基底文件頁面設定: ${mergedBody.getPageWidth()} x ${mergedBody.getPageHeight()} pt (寬 x 高)`);
+
+  // 2. 將剩餘文件附加到合併文件（從第 2 個開始）
+  for (let index = 1; index < docsList.length; index++) {
+    const file = docsList[index];
+    console.log(`    附加 ${index + 1}/${docsList.length}: ${file.getName()}`);
 
     try {
-      // 3a. 開啟來源文件
+      // 2a. 插入分頁符號（在附加新文件前）
+      mergedBody.appendPageBreak();
+
+      // 2b. 開啟來源文件
       const sourceDoc = DocumentApp.openById(file.getId());
       const sourceBody = sourceDoc.getBody();
 
-      // 3b. 複製所有元素到合併文件
+      // 2c. 複製來源文件的所有元素（整份複製）
       const numElements = sourceBody.getNumChildren();
       for (let i = 0; i < numElements; i++) {
         const element = sourceBody.getChild(i);
@@ -1184,41 +1176,32 @@ function mergeDocsToGoogleDocs(docsList, gradeBandName, originalGradeBand, merge
           const listItem = element.asListItem().copy();
           mergedBody.appendListItem(listItem);
         } else if (elementType === DocumentApp.ElementType.PAGE_BREAK) {
-          // 跳過原有的分頁符號，稍後統一插入
+          // 跳過原有的分頁符號（已在前面統一插入）
           continue;
         }
-        // 其他元素類型可以擴充
+        // 其他元素類型保留預設處理
       }
 
-      // 3c. 插入分頁符號（除了最後一個文件）
-      if (index < docsList.length - 1) {
-        mergedBody.appendPageBreak();
-      }
-
-      // 3d. 每複製 5 個文件休息 1 秒，避免超時
+      // 2d. 每附加 5 個文件休息 1 秒，避免超時
       if ((index + 1) % 5 === 0) {
+        console.log(`    已處理 ${index + 1} 個文件，暫停 1 秒...`);
         Utilities.sleep(1000);
       }
 
     } catch (e) {
-      console.error(`    ⚠️ 複製 ${file.getName()} 時發生錯誤: ${e.message}`);
+      console.error(`    ⚠️ 附加 ${file.getName()} 時發生錯誤: ${e.message}`);
       // 繼續處理下一個文件
     }
-  });
+  }
 
-  // 4. 儲存並關閉合併文件
+  // 3. 儲存並關閉合併文件
   mergedDoc.saveAndClose();
   console.log(`  文件合併完成`);
 
-  // 5. 取得合併文件並移動到 Merged 資料夾
-  const mergedDocFile = DriveApp.getFileById(mergedDoc.getId());
-
-  // 6. 設定檔名（使用原始 GradeBand 名稱，保留撇號等特殊字元）
+  // 4. 設定最終檔名（使用原始 GradeBand 名稱，保留撇號等特殊字元）
   const finalFileName = `${originalGradeBand}_2526_Fall_Midterm_Merged`;
   mergedDocFile.setName(finalFileName);
 
-  // 7. 移動到 Merged 資料夾
-  mergedDocFile.moveTo(mergedFolder);
   console.log(`  ✅ 已儲存: ${finalFileName}`);
   console.log(`  📁 位置: Merged 資料夾`);
 
