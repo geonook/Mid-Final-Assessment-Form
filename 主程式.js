@@ -890,13 +890,13 @@ function RUN() {
  *
  * 功能：
  * - 階段 1: 生成所有 168 個班級的 Google Docs（約 5-8 分鐘）
- * - 階段 2: 按 GradeBand 合併為 PDF（約 5-7 分鐘）
+ * - 階段 2: 按 GradeBand 合併為 Google Docs（約 5-7 分鐘）
  * - 總計約 10-15 分鐘
  *
  * 執行結果會顯示在日誌中，包含：
  * - 每個階段的進度
  * - 成功/失敗統計
- * - 生成的 PDF 檔案清單
+ * - 生成的合併檔案清單
  * - 輸出資料夾連結
  */
 function RUN_FULL_BATCH() {
@@ -969,7 +969,7 @@ function RUN_FULL_BATCH() {
  *
  * 功能：
  * - 生成所有 168 個班級的 Google Docs
- * - 不執行 PDF 合併（可稍後手動執行）
+ * - 不執行 Google Docs 合併（可稍後手動執行）
  * - 執行時間約 5-8 分鐘
  */
 function RUN_DOCS_ONLY() {
@@ -989,7 +989,7 @@ function RUN_DOCS_ONLY() {
     console.log('========================================');
     console.log('');
     console.log('💡 下一步：');
-    console.log('   執行 RUN_PDF_ONLY() 合併為 PDF');
+    console.log('   執行 RUN_MERGE_ONLY() 合併為 Google Docs');
     console.log('========================================');
 
   } catch (e) {
