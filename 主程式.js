@@ -175,19 +175,26 @@ function generateSingleReport(classData, students, studentIndexes) {
 
   console.log(`模板複製完成: ${fileName}`);
 
-  // 開啟文件
-  const doc = DocumentApp.openById(newFile.getId());
-  const body = doc.getBody();
-
-  // 步驟 1: 替換佔位符（第一頁）
+  // ============================================
+  // 階段 1: 替換佔位符（第一頁）
+  // ============================================
+  let doc = DocumentApp.openById(newFile.getId());
+  let body = doc.getBody();
   replacePlaceholders(body, classData);
-
-  // 步驟 2: 填充學生表格（第二頁）
-  fillStudentTable(body, students, studentIndexes);
-
   doc.saveAndClose();
-  console.log(`報告生成完成: ${fileName}`);
+  console.log(`階段 1 完成：佔位符替換完成`);
 
+  // ============================================
+  // 階段 2: 填充學生表格（第二頁）
+  // 重新打開文件以刷新內部結構
+  // ============================================
+  doc = DocumentApp.openById(newFile.getId());
+  body = doc.getBody();
+  fillStudentTable(body, students, studentIndexes);
+  doc.saveAndClose();
+  console.log(`階段 2 完成：學生表格填充完成`);
+
+  console.log(`報告生成完成: ${fileName}`);
   return newFile;
 }
 
