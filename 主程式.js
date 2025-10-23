@@ -876,6 +876,181 @@ function RUN() {
 }
 
 // ============================================
+// Apps Script 編輯器直接執行函數（無需 Google Sheets）
+// ============================================
+
+/**
+ * 🚀 快速批次執行入口 - 在 Apps Script 編輯器直接執行
+ *
+ * 使用方法：
+ * 1. 打開 Apps Script 編輯器
+ * 2. 在頂部函數選擇器選擇「RUN_FULL_BATCH」
+ * 3. 點擊「執行」按鈕 ▶
+ * 4. 查看執行日誌（View → Logs 或 Ctrl+Enter / Cmd+Enter）
+ *
+ * 功能：
+ * - 階段 1: 生成所有 168 個班級的 Google Docs（約 5-8 分鐘）
+ * - 階段 2: 按 GradeBand 合併為 PDF（約 5-7 分鐘）
+ * - 總計約 10-15 分鐘
+ *
+ * 執行結果會顯示在日誌中，包含：
+ * - 每個階段的進度
+ * - 成功/失敗統計
+ * - 生成的 PDF 檔案清單
+ * - 輸出資料夾連結
+ */
+function RUN_FULL_BATCH() {
+  try {
+    console.log('========================================');
+    console.log('🚀 RUN_FULL_BATCH() - 完整批次執行');
+    console.log('========================================');
+    console.log('');
+    console.log('⚠️ 預計執行時間：10-15 分鐘');
+    console.log('⚠️ 請勿關閉此視窗');
+    console.log('');
+
+    // 階段 1: 生成所有 Google Docs
+    console.log('========================================');
+    console.log('階段 1: 生成所有班級的 Google Docs 檔案');
+    console.log('========================================');
+
+    const docsResult = generateClassReports();
+    console.log('');
+    console.log(docsResult);
+    console.log('');
+
+    console.log('✅ 階段 1 完成，休息 5 秒後繼續...');
+    console.log('');
+    Utilities.sleep(5000);
+
+    // 階段 2: 合併為 PDF
+    console.log('========================================');
+    console.log('階段 2: 按 GradeBand 合併為 PDF');
+    console.log('========================================');
+
+    const pdfResult = mergeDocsToPDFByGradeBand();
+    console.log('');
+    console.log(pdfResult);
+    console.log('');
+
+    // 最終報告
+    console.log('========================================');
+    console.log('✅ 全部完成！');
+    console.log('========================================');
+    console.log('');
+    console.log('📁 輸出資料夾:');
+    console.log(`https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`);
+    console.log('');
+    console.log('💡 請開啟輸出資料夾檢查：');
+    console.log('   • 每個 GradeBand 子資料夾都有對應的 PDF');
+    console.log('   • PDF 檔案包含該 GradeBand 的所有班級');
+    console.log('   • 班級按字母順序排列');
+    console.log('========================================');
+
+  } catch (e) {
+    console.error('');
+    console.error('========================================');
+    console.error('❌ 執行失敗');
+    console.error('========================================');
+    console.error(`錯誤訊息: ${e.message}`);
+    console.error(`錯誤堆疊: ${e.stack}`);
+    console.error('========================================');
+    throw e;
+  }
+}
+
+/**
+ * 📄 只生成 Google Docs - 在 Apps Script 編輯器直接執行
+ *
+ * 使用方法：
+ * 1. 打開 Apps Script 編輯器
+ * 2. 在頂部函數選擇器選擇「RUN_DOCS_ONLY」
+ * 3. 點擊「執行」按鈕 ▶
+ *
+ * 功能：
+ * - 生成所有 168 個班級的 Google Docs
+ * - 不執行 PDF 合併（可稍後手動執行）
+ * - 執行時間約 5-8 分鐘
+ */
+function RUN_DOCS_ONLY() {
+  try {
+    console.log('========================================');
+    console.log('📄 RUN_DOCS_ONLY() - 只生成 Google Docs');
+    console.log('========================================');
+    console.log('');
+
+    const result = generateClassReports();
+
+    console.log('');
+    console.log(result);
+    console.log('');
+    console.log('========================================');
+    console.log('✅ Google Docs 生成完成！');
+    console.log('========================================');
+    console.log('');
+    console.log('💡 下一步：');
+    console.log('   執行 RUN_PDF_ONLY() 合併為 PDF');
+    console.log('========================================');
+
+  } catch (e) {
+    console.error('');
+    console.error('========================================');
+    console.error('❌ 執行失敗');
+    console.error('========================================');
+    console.error(`錯誤訊息: ${e.message}`);
+    console.error(`錯誤堆疊: ${e.stack}`);
+    console.error('========================================');
+    throw e;
+  }
+}
+
+/**
+ * 📑 只合併 PDF - 在 Apps Script 編輯器直接執行
+ *
+ * 使用方法：
+ * 1. 確保已經執行過 RUN_DOCS_ONLY() 或 generateClassReports()
+ * 2. 打開 Apps Script 編輯器
+ * 3. 在頂部函數選擇器選擇「RUN_PDF_ONLY」
+ * 4. 點擊「執行」按鈕 ▶
+ *
+ * 功能：
+ * - 讀取輸出資料夾中的 Google Docs
+ * - 按 GradeBand 合併為 PDF
+ * - 執行時間約 5-7 分鐘
+ */
+function RUN_PDF_ONLY() {
+  try {
+    console.log('========================================');
+    console.log('📑 RUN_PDF_ONLY() - 只合併 PDF');
+    console.log('========================================');
+    console.log('');
+
+    const result = mergeDocsToPDFByGradeBand();
+
+    console.log('');
+    console.log(result);
+    console.log('');
+    console.log('========================================');
+    console.log('✅ PDF 合併完成！');
+    console.log('========================================');
+    console.log('');
+    console.log('📁 輸出資料夾:');
+    console.log(`https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`);
+    console.log('========================================');
+
+  } catch (e) {
+    console.error('');
+    console.error('========================================');
+    console.error('❌ 執行失敗');
+    console.error('========================================');
+    console.error(`錯誤訊息: ${e.message}`);
+    console.error(`錯誤堆疊: ${e.stack}`);
+    console.error('========================================');
+    throw e;
+  }
+}
+
+// ============================================
 // PDF 合併功能（按 GradeBand 分組）
 // ============================================
 
