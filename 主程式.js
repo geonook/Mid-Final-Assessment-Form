@@ -556,9 +556,9 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('班級報告')
     .addItem('步驟 1: 生成所有 Google Docs', 'runReportGeneration')
-    .addItem('步驟 2: 合併為 PDF（按 GradeBand）', 'runMergeDocsToPDF')
+    .addItem('步驟 2: 合併為 Google Docs（按 GradeBand）', 'runMergeDocs')
     .addSeparator()
-    .addItem('🚀 一鍵執行（Docs + PDF）', 'runGenerateAndMergePDF')
+    .addItem('🚀 一鍵執行（Docs + 合併）', 'runGenerateAndMergeDocs')
     .addSeparator()
     .addItem('🧪 測試單一班級（v2）', 'testSingleClass')
     .addToUi();
@@ -578,11 +578,11 @@ function runReportGeneration() {
 }
 
 /**
- * 從選單執行 - 合併 Docs 為 PDF（按 GradeBand）
+ * 從選單執行 - 合併 Docs 為 Google Docs（按 GradeBand）
  */
-function runMergeDocsToPDF() {
+function runMergeDocs() {
   try {
-    const result = mergeDocsToPDFByGradeBand();
+    const result = mergeDocsByGradeBand();
     SpreadsheetApp.getUi().alert(result);
   } catch (e) {
     SpreadsheetApp.getUi().alert(`❌ 執行失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
@@ -591,11 +591,11 @@ function runMergeDocsToPDF() {
 }
 
 /**
- * 從選單執行 - 一鍵執行（生成 Docs + 合併 PDF）
+ * 從選單執行 - 一鍵執行（生成 Docs + 合併）
  */
-function runGenerateAndMergePDF() {
+function runGenerateAndMergeDocs() {
   try {
-    const result = generateAndMergePDFReports();
+    const result = generateAndMergeDocsReports();
     SpreadsheetApp.getUi().alert(result);
   } catch (e) {
     SpreadsheetApp.getUi().alert(`❌ 執行失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
@@ -923,14 +923,14 @@ function RUN_FULL_BATCH() {
     console.log('');
     Utilities.sleep(5000);
 
-    // 階段 2: 合併為 PDF
+    // 階段 2: 合併為 Google Docs
     console.log('========================================');
-    console.log('階段 2: 按 GradeBand 合併為 PDF');
+    console.log('階段 2: 按 GradeBand 合併為 Google Docs');
     console.log('========================================');
 
-    const pdfResult = mergeDocsToPDFByGradeBand();
+    const mergeResult = mergeDocsByGradeBand();
     console.log('');
-    console.log(pdfResult);
+    console.log(mergeResult);
     console.log('');
 
     // 最終報告
@@ -942,8 +942,8 @@ function RUN_FULL_BATCH() {
     console.log(`https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`);
     console.log('');
     console.log('💡 請開啟輸出資料夾檢查：');
-    console.log('   • 每個 GradeBand 子資料夾都有對應的 PDF');
-    console.log('   • PDF 檔案包含該 GradeBand 的所有班級');
+    console.log('   • Merged 資料夾包含每個 GradeBand 的合併檔案');
+    console.log('   • 合併檔案包含該 GradeBand 的所有班級');
     console.log('   • 班級按字母順序排列');
     console.log('========================================');
 
@@ -1005,33 +1005,33 @@ function RUN_DOCS_ONLY() {
 }
 
 /**
- * 📑 只合併 PDF - 在 Apps Script 編輯器直接執行
+ * 📑 只合併 Google Docs - 在 Apps Script 編輯器直接執行
  *
  * 使用方法：
  * 1. 確保已經執行過 RUN_DOCS_ONLY() 或 generateClassReports()
  * 2. 打開 Apps Script 編輯器
- * 3. 在頂部函數選擇器選擇「RUN_PDF_ONLY」
+ * 3. 在頂部函數選擇器選擇「RUN_MERGE_ONLY」
  * 4. 點擊「執行」按鈕 ▶
  *
  * 功能：
  * - 讀取輸出資料夾中的 Google Docs
- * - 按 GradeBand 合併為 PDF
+ * - 按 GradeBand 合併為 Google Docs
  * - 執行時間約 5-7 分鐘
  */
-function RUN_PDF_ONLY() {
+function RUN_MERGE_ONLY() {
   try {
     console.log('========================================');
-    console.log('📑 RUN_PDF_ONLY() - 只合併 PDF');
+    console.log('📑 RUN_MERGE_ONLY() - 只合併 Google Docs');
     console.log('========================================');
     console.log('');
 
-    const result = mergeDocsToPDFByGradeBand();
+    const result = mergeDocsByGradeBand();
 
     console.log('');
     console.log(result);
     console.log('');
     console.log('========================================');
-    console.log('✅ PDF 合併完成！');
+    console.log('✅ Google Docs 合併完成！');
     console.log('========================================');
     console.log('');
     console.log('📁 輸出資料夾:');
@@ -1051,7 +1051,7 @@ function RUN_PDF_ONLY() {
 }
 
 // ============================================
-// PDF 合併功能（按 GradeBand 分組）
+// Google Docs 合併功能（按 GradeBand 分組）
 // ============================================
 
 /**
@@ -1101,14 +1101,34 @@ function sortClassDataByGradeBandAndName(classData, classIndexes) {
 }
 
 /**
- * 將多個 Google Docs 合併為單一 PDF
+ * 建立或取得 "Merged" 資料夾
+ * @param {Folder} parentFolder - 父資料夾物件（輸出資料夾）
+ * @return {Folder} Merged 資料夾物件
+ */
+function getOrCreateMergedFolder(parentFolder) {
+  const mergedFolderName = 'Merged';
+
+  // 檢查是否已存在
+  const existingFolders = parentFolder.getFoldersByName(mergedFolderName);
+  if (existingFolders.hasNext()) {
+    console.log(`使用現有的 "${mergedFolderName}" 資料夾`);
+    return existingFolders.next();
+  }
+
+  // 建立新資料夾
+  console.log(`建立新的 "${mergedFolderName}" 資料夾`);
+  return parentFolder.createFolder(mergedFolderName);
+}
+
+/**
+ * 將多個 Google Docs 合併為單一 Google Docs
  * @param {Array} docsList - Google Docs File 物件陣列
  * @param {String} gradeBandName - GradeBand 名稱（資料夾名稱，例如 "G1_LTs"）
  * @param {String} originalGradeBand - 原始 GradeBand 名稱（例如 "G1 LT's"）
- * @param {Folder} targetFolder - 目標資料夾物件
- * @return {File} 生成的 PDF File 物件
+ * @param {Folder} mergedFolder - Merged 資料夾物件
+ * @return {File} 生成的 Google Docs File 物件
  */
-function mergeDocsIntoPDF(docsList, gradeBandName, originalGradeBand, targetFolder) {
+function mergeDocsToGoogleDocs(docsList, gradeBandName, originalGradeBand, mergedFolder) {
   console.log(`  開始合併 ${docsList.length} 個文件...`);
 
   // 1. 創建臨時合併文件
@@ -1186,36 +1206,33 @@ function mergeDocsIntoPDF(docsList, gradeBandName, originalGradeBand, targetFold
     }
   });
 
-  // 4. 儲存並關閉臨時文件
+  // 4. 儲存並關閉合併文件
   mergedDoc.saveAndClose();
-  console.log(`  文件合併完成，開始匯出 PDF...`);
+  console.log(`  文件合併完成`);
 
-  // 5. 匯出為 PDF
+  // 5. 取得合併文件並移動到 Merged 資料夾
   const mergedDocFile = DriveApp.getFileById(mergedDoc.getId());
-  const pdfBlob = mergedDocFile.getAs(MimeType.PDF);
 
-  // 6. 設定 PDF 檔名（使用原始 GradeBand 名稱，保留撇號等特殊字元）
-  const pdfFileName = `${originalGradeBand}_2526_Fall_Midterm.pdf`;
-  pdfBlob.setName(pdfFileName);
+  // 6. 設定檔名（使用原始 GradeBand 名稱，保留撇號等特殊字元）
+  const finalFileName = `${originalGradeBand}_2526_Fall_Midterm_Merged`;
+  mergedDocFile.setName(finalFileName);
 
-  // 7. 儲存 PDF 到目標資料夾
-  const pdfFile = targetFolder.createFile(pdfBlob);
-  console.log(`  ✅ PDF 已儲存: ${pdfFileName}`);
+  // 7. 移動到 Merged 資料夾
+  mergedDocFile.moveTo(mergedFolder);
+  console.log(`  ✅ 已儲存: ${finalFileName}`);
+  console.log(`  📁 位置: Merged 資料夾`);
 
-  // 8. 刪除臨時 Docs
-  mergedDocFile.setTrashed(true);
-
-  return pdfFile;
+  return mergedDocFile;
 }
 
 /**
- * 按 GradeBand 將 Google Docs 合併為 PDF
- * 讀取輸出資料夾中的所有 GradeBand 子資料夾，將每個子資料夾中的 Docs 合併為單一 PDF
+ * 按 GradeBand 將 Google Docs 合併為 Google Docs
+ * 讀取輸出資料夾中的所有 GradeBand 子資料夾，將每個子資料夾中的 Docs 合併為單一 Google Docs
  */
-function mergeDocsToPDFByGradeBand() {
+function mergeDocsByGradeBand() {
   try {
     console.log('========================================');
-    console.log('📄 按 GradeBand 合併為 PDF');
+    console.log('📄 按 GradeBand 合併為 Google Docs');
     console.log('========================================');
 
     // 1. 取得輸出資料夾
@@ -1223,7 +1240,12 @@ function mergeDocsToPDFByGradeBand() {
     console.log(`輸出資料夾: ${parentFolder.getName()}`);
     console.log('');
 
-    // 2. 遍歷所有 GradeBand 子資料夾
+    // 2. 建立或取得 Merged 資料夾
+    const mergedFolder = getOrCreateMergedFolder(parentFolder);
+    console.log(`合併檔案將儲存至: ${mergedFolder.getName()} 資料夾`);
+    console.log('');
+
+    // 3. 遍歷所有 GradeBand 子資料夾
     const subfolders = parentFolder.getFolders();
     const results = [];
     const errors = [];
@@ -1279,15 +1301,15 @@ function mergeDocsToPDFByGradeBand() {
           .replace(/LTs/g, "LT's")  // 特殊處理：LTs → LT's
           .replace(/ITs/g, "IT's"); // 特殊處理：ITs → IT's
 
-        // 3d. 合併所有 Docs 為單一 PDF
-        const pdfFile = mergeDocsIntoPDF(docsList, gradeBandFolderName, originalGradeBand, subfolder);
+        // 3d. 合併所有 Docs 為單一 Google Docs
+        const mergedDoc = mergeDocsToGoogleDocs(docsList, gradeBandFolderName, originalGradeBand, mergedFolder);
 
         results.push({
           gradeBand: originalGradeBand,
           folderName: gradeBandFolderName,
           classCount: docsList.length,
-          pdfUrl: pdfFile.getUrl(),
-          pdfName: pdfFile.getName()
+          docUrl: mergedDoc.getUrl(),
+          docName: mergedDoc.getName()
         });
 
         console.log(`✅ ${gradeBandFolderName} 完成 (${docsList.length} 個班級)`);
@@ -1315,7 +1337,7 @@ function mergeDocsToPDFByGradeBand() {
  * 格式化合併結果報告
  */
 function formatMergeResults(results, errors) {
-  let message = `✅ PDF 合併完成！\n\n`;
+  let message = `✅ Google Docs 合併完成！\n\n`;
   message += `📊 成功: ${results.length} 個 GradeBand\n`;
 
   if (errors.length > 0) {
@@ -1323,12 +1345,13 @@ function formatMergeResults(results, errors) {
   }
 
   if (results.length > 0) {
-    message += `\n📁 生成的 PDF 檔案：\n`;
+    message += `\n📁 生成的合併檔案（Merged 資料夾內）：\n`;
 
     results.forEach(item => {
       message += `\n  📂 ${item.gradeBand} (${item.folderName}):\n`;
-      message += `    • ${item.pdfName}\n`;
+      message += `    • ${item.docName}\n`;
       message += `    • 包含 ${item.classCount} 個班級\n`;
+      message += `    • 連結: ${item.docUrl}\n`;
     });
 
     message += `\n🔗 主資料夾: https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`;
@@ -1345,12 +1368,12 @@ function formatMergeResults(results, errors) {
 }
 
 /**
- * 主函數：生成所有班級的 Google Docs 並合併為 PDF（按 GradeBand）
+ * 主函數：生成所有班級的 Google Docs 並合併（按 GradeBand）
  * 自動執行兩階段流程：
  * 1. 生成所有獨立的 Google Docs 檔案
- * 2. 按 GradeBand 合併為 PDF
+ * 2. 按 GradeBand 合併為 Google Docs
  */
-function generateAndMergePDFReports() {
+function generateAndMergeDocsReports() {
   try {
     console.log('========================================');
     console.log('🚀 自動兩階段執行');
@@ -1369,13 +1392,13 @@ function generateAndMergePDFReports() {
     console.log('');
     Utilities.sleep(5000);
 
-    // 階段 2: 合併為 PDF
+    // 階段 2: 合併為 Google Docs
     console.log('========================================');
-    console.log('階段 2: 按 GradeBand 合併為 PDF');
+    console.log('階段 2: 按 GradeBand 合併為 Google Docs');
     console.log('========================================');
 
-    const pdfResult = mergeDocsToPDFByGradeBand();
-    console.log(pdfResult);
+    const mergeResult = mergeDocsByGradeBand();
+    console.log(mergeResult);
 
     // 最終報告
     const finalReport = `✅ 全部完成！
@@ -1383,8 +1406,8 @@ function generateAndMergePDFReports() {
 【階段 1: Google Docs 生成】
 ${docsResult}
 
-【階段 2: PDF 合併】
-${pdfResult}
+【階段 2: Google Docs 合併】
+${mergeResult}
 `;
 
     return finalReport;
