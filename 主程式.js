@@ -25,15 +25,15 @@ const CONFIG = {
 
   // 表格設定
   studentTableIndex: 2,  // 學生名單表格（第三個表格，tables[2]）
-  columnWidths: [48, 48, 55, 75, 50, 74],  // 6 欄寬度（總計 350pt ≈ 12.3cm，適應右欄版面）
+  columnWidths: [75, 75, 95, 100, 85, 155],  // 6 欄寬度（總計 585pt ≈ 20.6cm）
   // [Student ID, Homeroom, Chinese Name, English Name, Present, Signed Paper]
-  // 每欄約 1.7-2.6cm（標題可在模板中使用換行縮減寬度）
+  // 欄寬足以讓標題完整顯示不需換行
 
-  // 字體大小設定（根據學生人數）
+  // 字體大小設定（固定 10pt）
   fontSize: {
-    large: 11,   // 1-12 人
-    medium: 10,  // 13-18 人
-    small: 9     // 19-21 人
+    large: 10,   // 固定 10pt
+    medium: 10,  // 固定 10pt
+    small: 10    // 固定 10pt
   },
 
   // 檔案命名
@@ -227,46 +227,73 @@ function fillStudentTable(body, students, studentIndexes) {
   }
 
   const studentTable = tables[CONFIG.studentTableIndex];
+  console.log(`表格初始行數: ${studentTable.getNumRows()}`);
 
-  // 步驟 3: 清除現有資料行（保留標題行）
-  while (studentTable.getNumRows() > 1) {
-    studentTable.removeRow(1);
-  }
-
-  // 步驟 4: 計算字體大小
+  // 步驟 3: 計算字體大小
   const fontSize = calculateFontSize(sortedStudents.length);
 
-  // 步驟 5: 填充學生資料
-  sortedStudents.forEach(student => {
-    const row = studentTable.appendTableRow();
+  // 步驟 3.5: 先設定欄寬（在填充前，確保生效）
+  const totalWidth = CONFIG.columnWidths.reduce((a, b) => a + b, 0);
+  console.log(`設定欄寬: [${CONFIG.columnWidths.join(', ')}] (總計: ${totalWidth} pt)`);
+  for (let col = 0; col < CONFIG.columnWidths.length; col++) {
+    studentTable.setColumnWidth(col, CONFIG.columnWidths[col]);
+  }
 
-    // 填入 6 欄資料（使用 editAsText 確保正確初始化）
-    row.getCell(0).editAsText().setText(String(student[studentIndexes.ID] || ''));
-    row.getCell(1).editAsText().setText(String(student[studentIndexes["Home Room"]] || ''));
-    row.getCell(2).editAsText().setText(String(student[studentIndexes["Chinese Name"]] || ''));
-    row.getCell(3).editAsText().setText(String(student[studentIndexes["English Name"]] || ''));
-    row.getCell(4).editAsText().setText('☐');  // Present 勾選框
-    row.getCell(5).editAsText().setText('☐');  // Signed Paper Returned 勾選框
+  // 步驟 4: 填充學生資料（Solution C: 直接覆寫現有行，避免 appendTableRow 的 0-cell bug）
+  sortedStudents.forEach((student, index) => {
+    const rowIndex = index + 1; // 跳過標題行（索引 0）
+    let row;
+
+    if (rowIndex < studentTable.getNumRows()) {
+      // 使用現有行（模板預設有 24 行，不創建新行避免 cell 數量為 0 的問題）
+      row = studentTable.getRow(rowIndex);
+    } else {
+      // 如果學生數超過模板預設行數，創建新行
+      console.log(`創建新行 ${rowIndex}（超過模板預設行數）`);
+      row = studentTable.insertTableRow(rowIndex);
+
+      // 手動確保有 6 個 cells（解決 appendTableRow 創建 0 cell 的問題）
+      while (row.getNumCells() < 6) {
+        row.appendTableCell('');
+      }
+    }
+
+    // 填入 6 欄資料
+    const values = [
+      String(student[studentIndexes.ID] || ''),
+      String(student[studentIndexes["Home Room"]] || ''),
+      String(student[studentIndexes["Chinese Name"]] || ''),
+      String(student[studentIndexes["English Name"]] || ''),
+      '☐',  // Present 勾選框
+      '☐'   // Signed Paper Returned 勾選框
+    ];
+
+    for (let col = 0; col < 6; col++) {
+      const cell = row.getCell(col);
+      cell.setText(values[col]);
+    }
 
     // 格式化行
     formatTableRow(row, fontSize);
   });
 
+  // 步驟 5: 清除多餘的行（如果學生數少於模板預設行數）
+  const targetRows = sortedStudents.length + 1; // +1 for header
+  while (studentTable.getNumRows() > targetRows) {
+    const lastRowIndex = studentTable.getNumRows() - 1;
+    studentTable.removeRow(lastRowIndex);
+  }
+
   // 步驟 6: 格式化標題行
   formatTableRow(studentTable.getRow(0), fontSize, true);
 
-  // 步驟 7: 設定欄寬
-  for (let col = 0; col < CONFIG.columnWidths.length; col++) {
-    studentTable.setColumnWidth(col, CONFIG.columnWidths[col]);
-  }
-
-  // 步驟 8: 設定表格邊框
+  // 步驟 7: 設定表格邊框（欄寬已在步驟 3.5 設定）
   studentTable.setAttributes({
     [DocumentApp.Attribute.BORDER_WIDTH]: 1,
     [DocumentApp.Attribute.BORDER_COLOR]: '#000000'
   });
 
-  console.log(`表格填充完成: ${sortedStudents.length} 筆資料`);
+  console.log(`表格填充完成: ${sortedStudents.length} 筆資料，最終行數: ${studentTable.getNumRows()}`);
 }
 
 // ============================================
