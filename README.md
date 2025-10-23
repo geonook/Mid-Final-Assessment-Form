@@ -1,6 +1,8 @@
-# 2526 Fall Midterm 班級報告生成器 (v2.1)
+# 2526 Fall Midterm 班級報告生成器 (v2.2-beta)
 
-自動化生成期中考試班級報告的 Google Apps Script 專案。從 Google Sheets 讀取學生與班級資料，批次生成格式化的 Google Docs 報告，並自動按 GradeBand 合併為 PDF。
+自動化生成期中考試班級報告的 Google Apps Script 專案。從 Google Sheets 讀取學生與班級資料，批次生成格式化的 Google Docs 報告。
+
+> ⚠️ **v2.2-beta 注意事項**：Google Docs 合併功能目前處於測試階段，合併後的文件有格式問題（第一個班級正確，後續班級版面跑版）。建議使用個別班級文件，或等待功能改進。
 
 ## 🎯 功能特色
 
@@ -8,9 +10,9 @@
 - ✅ **按學號排序** - 學生名單自動數值排序
 - ✅ **固定字體 10pt** - 一致的格式化輸出
 - ✅ **GradeBand 分組** - 自動建立子資料夾分類
-- ✅ **PDF 自動合併** - 每個 GradeBand 合併為單一 PDF
+- ⚠️ **Google Docs 合併（測試中）** - 每個 GradeBand 合併為單一 Google Docs（有格式問題）
 - ✅ **兩種執行方式** - Google Sheets 選單或 Apps Script 編輯器直接執行
-- ✅ **兩階段處理** - 可分別生成文件和合併 PDF，或一鍵完成
+- ✅ **兩階段處理** - 可分別生成文件和合併，或一鍵完成
 - ✅ 6 欄表格：學號、班級、中文名、英文名、出席、簽收
 - ✅ 批次處理，含錯誤處理與超時防護
 - ✅ 自動檔案命名：`{班級}_{老師}_2526_Fall_Midterm_v2_{時間戳}`
@@ -71,14 +73,16 @@ const CONFIG = {
 
 ### 3. 執行生成
 
+> ⚠️ **建議**：由於 Google Docs 合併功能有格式問題，建議僅執行「步驟 1」生成個別班級文件
+
 #### 方式 1：Google Sheets 選單（推薦給一般使用者）
 
 1. 重新整理 Google Sheets 頁面
 2. 點擊選單列的 **班級報告**
 3. 選擇執行模式：
-   - **🚀 一鍵執行（Docs + PDF）**：完整自動化流程（推薦）
-   - **步驟 1: 生成所有 Google Docs**：僅生成文件（想在合併前檢視）
-   - **步驟 2: 合併為 PDF（按 GradeBand）**：僅合併 PDF（需先完成步驟 1）
+   - **步驟 1: 生成所有 Google Docs**：僅生成文件（✅ 推薦）
+   - **步驟 2: 合併為 Google Docs（按 GradeBand）**：僅合併（⚠️ 有格式問題）
+   - **🚀 一鍵執行（Docs + 合併）**：完整流程（⚠️ 合併有問題）
    - **🧪 測試單一班級（v2）**：測試單一班級（快速驗證）
 4. 等待處理完成（會顯示成功/失敗訊息）
 5. 前往輸出資料夾檢視生成的報告
@@ -87,17 +91,17 @@ const CONFIG = {
 
 1. 開啟 Apps Script 專案：**Extensions** → **Apps Script**
 2. 從函數下拉選單選擇：
-   - **`RUN_FULL_BATCH()`**：完整批次處理（Docs + PDF）- **推薦**
-   - **`RUN_DOCS_ONLY()`**：僅生成 Google Docs
-   - **`RUN_PDF_ONLY()`**：僅合併 PDF（需先執行 `RUN_DOCS_ONLY()`）
+   - **`RUN_DOCS_ONLY()`**：僅生成 Google Docs（✅ 推薦）
+   - **`RUN_MERGE_ONLY()`**：僅合併為 Google Docs（⚠️ 有格式問題）
+   - **`RUN_FULL_BATCH()`**：完整批次處理（Docs + 合併）（⚠️ 合併有問題）
 3. 點擊執行 ▶ 按鈕
 4. 在控制台即時監控執行記錄
 5. 前往輸出資料夾檢視結果
 
 **執行時間估計**（以 168 個班級為例）：
-- 僅生成 Docs：約 8-10 分鐘
-- 僅合併 PDF：約 2-3 分鐘
-- 完整批次：約 10-15 分鐘
+- 僅生成 Docs：約 8-10 分鐘（✅ 推薦）
+- 僅合併 Google Docs：約 2-3 分鐘（⚠️ 有格式問題）
+- 完整批次：約 10-15 分鐘（⚠️ 合併有問題）
 - 測試單一班級：約 5-10 秒
 
 ## 📊 資料格式要求
@@ -138,19 +142,21 @@ const CONFIG = {
 ├── G1_LTs/
 │   ├── A1_JohnDoe_2526_Fall_Midterm_v2_20251023_143052.docx
 │   ├── A2_JaneSmith_2526_Fall_Midterm_v2_20251023_143055.docx
-│   ├── ...
-│   └── G1 LT's_2526_Fall_Midterm.pdf  ← 合併後的 PDF
+│   └── ... (所有個別班級文件)
 ├── G1_ITs/
 │   ├── B1_...docx
-│   └── G1 IT's_2526_Fall_Midterm.pdf
+│   └── ... (所有個別班級文件)
 ├── G2_LTs/
-│   └── G2 LT's_2526_Fall_Midterm.pdf
-└── ...
+│   └── ... (所有個別班級文件)
+└── Merged/  ← ⚠️ 測試版：合併文件（有格式問題）
+    ├── G1 LT's_2526_Fall_Midterm_Merged.docx
+    ├── G1 IT's_2526_Fall_Midterm_Merged.docx
+    └── G2 LT's_2526_Fall_Midterm_Merged.docx
 ```
 
 **檔案命名規則**：
 - **個別 Docs**：`{班級}_{老師}_{學期}_{時間戳}.docx`
-- **合併 PDF**：`{GradeBand}_{學期}.pdf`
+- **合併 Docs**：`{GradeBand}_{學期}_Merged.docx`（⚠️ 有格式問題）
 
 ## 🛠️ 輔助工具
 
@@ -163,9 +169,9 @@ const CONFIG = {
 輸出資訊：頁面尺寸、表格數量、欄位結構、佔位符等
 
 ### 批次轉換 PDF（舊版，不建議）
-**注意**：v2.1 已內建 PDF 合併功能，不需使用此工具。
+**注意**：v2.2-beta 已移除 PDF 合併功能，改為 Google Docs 合併（有格式問題）。
 
-若需要將個別 Docs 轉換為個別 PDF（而非 GradeBand 合併）：
+若需要將個別 Docs 轉換為個別 PDF：
 1. 編輯 `輔助工具/轉檔.js` 中的資料夾 ID
 2. 在 Apps Script 編輯器執行：`batchDownloadDocsToPDF()`
 3. PDF 檔案會儲存到指定資料夾
@@ -174,18 +180,20 @@ const CONFIG = {
 
 ### 核心邏輯流程
 
-**階段 1：文件生成**
+**階段 1：文件生成（✅ 穩定）**
 ```
 讀取資料 → 班級排序(GradeBand→ClassName) → 學生分組 → 學生排序(ID)
 → 複製模板 → 替換佔位符 → 填充表格 → 格式化 → 儲存至 GradeBand 子資料夾
 ```
 
-**階段 2：PDF 合併（可選）**
+**階段 2：Google Docs 合併（⚠️ 測試中，有格式問題）**
 ```
 掃描 GradeBand 子資料夾 → 讀取所有 Docs → 排序(ClassName)
-→ 建立臨時合併 Doc → 逐一複製元素 → 插入分頁符
-→ 匯出為 PDF → 刪除臨時 Doc
+→ 複製第一個 Doc 作為基底 (makeCopy) → 附加其他 Docs 元素 → 插入分頁符
+→ 儲存到 Merged 資料夾
 ```
+
+**⚠️ 已知問題**：第一個班級格式正確，後續班級版面跑版（元素逐一複製無法保留複雜的多欄版面配置）
 
 ### 班級排序（NEW）
 兩層排序確保一致性：
@@ -231,17 +239,20 @@ replacePlaceholders(body, classData);
 4. 套用格式（對齊、字體、邊框）
 5. 設定欄寬（總計 585pt）
 
-### PDF 合併架構（NEW）
-元素逐一複製保留模板格式：
-1. 建立臨時合併文件
-2. 對每個班級 Doc：
+### Google Docs 合併架構（⚠️ 測試中）
+使用 `makeCopy()` 複製第一個文件 + 元素附加：
+1. 複製第一個班級 Doc 作為基底（`DriveApp.makeCopy()`）
+2. 對剩餘班級 Doc：
+   - 插入分頁符
    - 開啟來源文件
    - 複製所有元素（段落、表格、清單）使用 `.copy()`
    - 附加至合併文件主體
-   - 插入分頁符（班級之間）
-3. 匯出合併 Doc 為 PDF
-4. 刪除臨時 Doc
-- **優點**：保留所有模板格式與結構，無硬編碼內容
+3. 儲存到 Merged 資料夾
+
+**⚠️ 已知問題**：
+- 第一個班級格式正確（完整複製）
+- 後續班級格式跑版（逐元素複製無法保留複雜版面）
+- 根本原因：元素逐一複製不支援多欄版面、絕對定位、精確間距
 
 ## 🔍 常見問題
 
@@ -257,12 +268,15 @@ replacePlaceholders(body, classData);
 2. 欄位值不是空白或 `undefined`
 3. 模板中的佔位符格式正確：`{{FieldName}}`（大小寫需一致）
 
-### Q: PDF 合併失敗或超時？
-**A**:
-- 確保已先執行文件生成（階段 1）
-- 檢查 GradeBand 子資料夾是否包含 Google Docs 檔案
-- 若班級數量過多（>100），考慮分批處理
-- 查看控制台記錄找出失敗的 GradeBand
+### Q: 合併後的 Google Docs 格式跑版？（⚠️ v2.2-beta 已知問題）
+**A**: 這是目前版本的已知限制：
+- **原因**：元素逐一複製無法保留複雜的多欄版面配置
+- **影響**：第一個班級正確，後續班級版面錯亂
+- **暫時解決方案**：
+  1. 僅使用個別班級文件（執行 `RUN_DOCS_ONLY()`）
+  2. 手動合併或使用第三方工具
+  3. 等待未來版本改進（可能使用 Google Docs API）
+- **狀態**：正在研究更好的合併方法
 
 ### Q: 部分班級生成失敗？
 **A**: 檢查執行記錄（Apps Script 編輯器 > 查看 > 記錄檔），通常是因為：
@@ -289,9 +303,9 @@ replacePlaceholders(body, classData);
 
 ```
 Mid-Final Assessment Form-template/
-├── 主程式.js              # 主要生成邏輯（1,376 行）
-│                          # - 文件生成（階段 1）
-│                          # - PDF 合併（階段 2）
+├── 主程式.js              # 主要生成邏輯（~1,350 行）
+│                          # - 文件生成（階段 1）✅
+│                          # - Google Docs 合併（階段 2）⚠️
 │                          # - Apps Script 直接執行函數
 ├── 輔助工具/
 │   ├── 分析模板.js        # 模板結構分析工具
@@ -326,14 +340,24 @@ clasp logs
 
 ## 🎓 版本資訊
 
-**版本**: 2.1 (PDF 合併 + 直接執行)
+**版本**: 2.2-beta (Google Docs 合併測試版)
 **學期**: 2526 Fall Midterm
 **最後更新**: 2025-10-23
 
-**v2.1 重大變更** (2025-10-23)：
+**v2.2-beta 變更** (2025-10-23)：
+- ⚠️ **Google Docs 合併功能（測試中）**：改為合併到 Google Docs 而非 PDF
+  - 使用 `makeCopy()` + 元素附加方式
+  - **已知問題**：第一個班級正確，後續班級格式跑版
+  - 合併檔案儲存至 Merged 資料夾
+- 📝 更新所有文件說明反映目前狀態
+- 🔄 函式重新命名：`mergeDocsToPDF*` → `mergeDocs*`
+- 📁 新增 Merged 資料夾用於存放合併文件
+- ⚠️ 建議僅使用階段 1（文件生成），跳過合併功能
+
+**v2.1 變更** (2025-10-23)：
 - ✨ PDF 自動合併功能（按 GradeBand）
-- ✨ Apps Script 編輯器直接執行（`RUN_FULL_BATCH()`, `RUN_DOCS_ONLY()`, `RUN_PDF_ONLY()`）
-- ✨ 兩階段處理架構（文件生成 + PDF 合併）
+- ✨ Apps Script 編輯器直接執行（`RUN_FULL_BATCH()`, `RUN_DOCS_ONLY()`, `RUN_MERGE_ONLY()`）
+- ✨ 兩階段處理架構（文件生成 + 合併）
 - ✨ GradeBand 子資料夾自動組織
 - ✨ 固定字體 10pt（取代動態字體）
 - ✨ 欄寬優化至 585pt（標題完整顯示）
@@ -342,7 +366,7 @@ clasp logs
 - ✨ 超時防護與錯誤恢復機制
 
 **v2.0 變更** (2025-10-13)：
-- 程式碼簡化（450 → 414 行，v2.1 擴充至 1,376 行）
+- 程式碼簡化（450 → 414 行，v2.1 擴充至 ~1,350 行）
 - 集中配置到單一 CONFIG 物件
 - 模板複製填充方法（避免 appendTableRow 0-cell bug）
 
