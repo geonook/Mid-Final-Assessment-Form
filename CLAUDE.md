@@ -241,12 +241,21 @@ Mid-Final Assessment Form-template/
 - **Reports**: Page dimensions, table count/structure, placeholder presence, column widths
 - **Use when**: Template structure changes or debugging table access
 
-**輔助工具/轉檔.js** - PDF converter (HELPER TOOL - LEGACY)
-- **Purpose**: Batch convert generated docs to PDF (individual files)
-- **Main function**: `batchDownloadDocsToPDF()`
-- **Features**: Duplicate checking, progress logging, rate limiting
-- **Folder ID**: `1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi` (same as output folder)
-- **Note**: For GradeBand-merged PDFs, use `mergeDocsToPDFByGradeBand()` in main script instead
+**輔助工具/轉檔.js** - PDF converter (HELPER TOOL - UPDATED)
+- **Purpose**: Batch convert Google Docs to individual PDF files
+- **Main functions**:
+  - `convertAllSubfoldersDocsToPDF()`: Convert all GradeBand subfolders (✅ RECOMMENDED)
+  - `batchDownloadDocsToPDF()`: Convert single folder (legacy)
+  - `convertSingleFolderDocsToPDF(folder)`: Shared conversion logic
+- **Features**:
+  - Recursive subfolder processing
+  - Automatic skip of Merged folder
+  - Duplicate checking (skip existing PDFs)
+  - Progress logging and statistics
+  - Rate limiting (every 10 files)
+- **Output**: PDFs saved in same subfolder as source Docs
+- **Usage**: Run `convertAllSubfoldersDocsToPDF()` from Apps Script editor
+- **Execution time**: ~6-9 minutes for 168 classes
 
 ### Common Patterns
 
@@ -398,9 +407,36 @@ Output Folder (CONFIG.outputFolderId)
     └── G2 LT's_2526_Fall_Midterm_Merged.docx
 ```
 
+### PDF Conversion (Optional)
+If you need individual PDF files for each class:
+
+1. **Open Apps Script editor**: Extensions → Apps Script
+2. **Select function**: `convertAllSubfoldersDocsToPDF` from dropdown
+3. **Click Run** ▶
+4. **Wait for completion**: ~6-9 minutes for 168 classes
+5. **Check results**: PDFs saved in same subfolders as Docs
+
+**Output structure after PDF conversion**:
+```
+Output Folder (CONFIG.outputFolderId)
+├── G1_LTs/
+│   ├── A1_TeacherName_xxx.docx         ← Google Docs
+│   ├── A1_TeacherName_xxx.pdf          ← PDF
+│   ├── A2_TeacherName_xxx.docx
+│   ├── A2_TeacherName_xxx.pdf
+│   └── ...
+└── ...
+```
+
+**Features**:
+- ✅ Automatic subfolder processing
+- ✅ Skip existing PDFs (no duplicates)
+- ✅ Detailed progress logging
+- ✅ Skip Merged folder automatically
+
 ### Troubleshooting Tools
 - **Template debugging**: Run `輔助工具/分析模板.js` → `analyzeTemplateStructure()`
-- **Individual PDF conversion** (legacy): Run `輔助工具/轉檔.js` → `batchDownloadDocsToPDF()`
+- **Single folder PDF conversion**: Run `輔助工具/轉檔.js` → `batchDownloadDocsToPDF()`
 
 ## Important Implementation Details (2526 Fall Midterm)
 

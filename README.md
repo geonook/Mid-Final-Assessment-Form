@@ -102,6 +102,7 @@ const CONFIG = {
 - 僅生成 Docs：約 8-10 分鐘（✅ 推薦）
 - 僅合併 Google Docs：約 2-3 分鐘（⚠️ 有格式問題）
 - 完整批次：約 10-15 分鐘（⚠️ 合併有問題）
+- 轉換為 PDF：約 6-9 分鐘（✅ 可選，見「輔助工具」章節）
 - 測試單一班級：約 5-10 秒
 
 ## 📊 資料格式要求
@@ -141,13 +142,16 @@ const CONFIG = {
 輸出資料夾 (CONFIG.outputFolderId)
 ├── G1_LTs/
 │   ├── A1_JohnDoe_2526_Fall_Midterm_v2_20251023_143052.docx
+│   ├── A1_JohnDoe_2526_Fall_Midterm_v2_20251023_143052.pdf  ← 可選：轉換後的 PDF
 │   ├── A2_JaneSmith_2526_Fall_Midterm_v2_20251023_143055.docx
+│   ├── A2_JaneSmith_2526_Fall_Midterm_v2_20251023_143055.pdf
 │   └── ... (所有個別班級文件)
 ├── G1_ITs/
 │   ├── B1_...docx
+│   ├── B1_...pdf  ← 可選：轉換後的 PDF
 │   └── ... (所有個別班級文件)
 ├── G2_LTs/
-│   └── ... (所有個別班級文件)
+│   └── ... (所有個別班級文件 + PDF)
 └── Merged/  ← ⚠️ 測試版：合併文件（有格式問題）
     ├── G1 LT's_2526_Fall_Midterm_Merged.docx
     ├── G1 IT's_2526_Fall_Midterm_Merged.docx
@@ -156,9 +160,37 @@ const CONFIG = {
 
 **檔案命名規則**：
 - **個別 Docs**：`{班級}_{老師}_{學期}_{時間戳}.docx`
+- **個別 PDF**：`{班級}_{老師}_{學期}_{時間戳}.pdf`（可選，需額外執行轉換）
 - **合併 Docs**：`{GradeBand}_{學期}_Merged.docx`（⚠️ 有格式問題）
 
 ## 🛠️ 輔助工具
+
+### 批次轉換個別 PDF（✅ 推薦）
+將所有班級 Google Docs 轉換為個別 PDF 檔案：
+
+**執行步驟**：
+1. 開啟 Apps Script 編輯器：**Extensions** → **Apps Script**
+2. 從函數下拉選單選擇：**`convertAllSubfoldersDocsToPDF`**
+3. 點擊執行 ▶ 按鈕
+4. 等待處理完成（168 個班級約 6-9 分鐘）
+5. PDF 檔案會儲存在與 Google Docs 相同的子資料夾內
+
+**功能特色**：
+- ✅ 自動處理所有 GradeBand 子資料夾
+- ✅ 自動跳過 Merged 資料夾
+- ✅ 自動跳過已存在的 PDF（不重複轉換）
+- ✅ 顯示詳細處理進度和統計結果
+- ✅ 超時防護（每 10 個檔案休息 1 秒）
+
+**輸出結果**：
+```
+G1_LTs/
+├── A1_Teacher_xxx.docx         ← Google Docs
+├── A1_Teacher_xxx.pdf          ← 新增 PDF
+├── A2_Teacher_xxx.docx
+├── A2_Teacher_xxx.pdf
+└── ...
+```
 
 ### 分析模板結構
 需要檢查模板格式時使用：
@@ -167,14 +199,6 @@ const CONFIG = {
 輔助工具/分析模板.js -> analyzeTemplateStructure()
 ```
 輸出資訊：頁面尺寸、表格數量、欄位結構、佔位符等
-
-### 批次轉換 PDF（舊版，不建議）
-**注意**：v2.2-beta 已移除 PDF 合併功能，改為 Google Docs 合併（有格式問題）。
-
-若需要將個別 Docs 轉換為個別 PDF：
-1. 編輯 `輔助工具/轉檔.js` 中的資料夾 ID
-2. 在 Apps Script 編輯器執行：`batchDownloadDocsToPDF()`
-3. PDF 檔案會儲存到指定資料夾
 
 ## ⚙️ 技術細節
 
