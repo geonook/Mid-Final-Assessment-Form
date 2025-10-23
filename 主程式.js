@@ -230,20 +230,13 @@ function fillStudentTable(body, students, studentIndexes) {
   sortedStudents.forEach(student => {
     const row = studentTable.appendTableRow();
 
-    // 初始化所有 6 個 cells（確保有 paragraph 元素）
-    for (let i = 0; i < 6; i++) {
-      if (row.getCell(i).getNumChildren() === 0) {
-        row.getCell(i).appendParagraph('');
-      }
-    }
-
-    // 填入 6 欄資料
-    row.getCell(0).setText(String(student[studentIndexes.ID] || ''));
-    row.getCell(1).setText(String(student[studentIndexes["Home Room"]] || ''));
-    row.getCell(2).setText(String(student[studentIndexes["Chinese Name"]] || ''));
-    row.getCell(3).setText(String(student[studentIndexes["English Name"]] || ''));
-    row.getCell(4).setText('☐');  // Present 勾選框
-    row.getCell(5).setText('☐');  // Signed Paper Returned 勾選框
+    // 填入 6 欄資料（使用 editAsText 確保正確初始化）
+    row.getCell(0).editAsText().setText(String(student[studentIndexes.ID] || ''));
+    row.getCell(1).editAsText().setText(String(student[studentIndexes["Home Room"]] || ''));
+    row.getCell(2).editAsText().setText(String(student[studentIndexes["Chinese Name"]] || ''));
+    row.getCell(3).editAsText().setText(String(student[studentIndexes["English Name"]] || ''));
+    row.getCell(4).editAsText().setText('☐');  // Present 勾選框
+    row.getCell(5).editAsText().setText('☐');  // Signed Paper Returned 勾選框
 
     // 格式化行
     formatTableRow(row, fontSize);
