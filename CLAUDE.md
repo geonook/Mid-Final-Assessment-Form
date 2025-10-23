@@ -1,9 +1,9 @@
 # CLAUDE.md - Mid-Final Assessment Form Generator
 
-> **Documentation Version**: 2.0
-> **Last Updated**: 2025-10-13
+> **Documentation Version**: 2.1
+> **Last Updated**: 2025-10-23
 > **Project**: 2526 Fall Midterm 班級報告生成器
-> **Description**: Google Apps Script project for generating mid-term and final assessment class reports from Google Sheets data
+> **Description**: Google Apps Script project for generating mid-term and final assessment class reports from Google Sheets data, with PDF merge by GradeBand and Apps Script direct execution
 > **Template**: Based on CLAUDE_TEMPLATE.md v1.0.0 by Chang Ho Chien
 
 This file provides essential guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -79,13 +79,16 @@ git push origin main
 
 Google Apps Script project for generating mid-term and final assessment class reports from Google Sheets data. The system reads student and class information from spreadsheets and generates formatted Google Docs reports with student lists organized by English class.
 
-**Current Version: 2526 Fall Midterm (v2.0 - Simplified)**
+**Current Version: 2526 Fall Midterm (v2.1 - PDF Merge + Direct Execution)**
 - Each class report = 2 pages (proctoring guidelines + student list)
 - Students automatically sorted by ID number (numeric)
 - Fills existing table in template (6 columns including Present/Signed checkboxes)
-- Supports up to 21 students per class
-- Dynamic font sizing (9-11pt based on class size)
-- **Code reduction**: 450 → 414 lines (8% reduction)
+- **Fixed font size**: 10pt for all content (consistent formatting)
+- **Column widths optimized**: 585pt total (headers display without line breaks)
+- **PDF merge by GradeBand**: Automatic merging of all classes per GradeBand into single PDF
+- **Apps Script direct execution**: Run from Apps Script editor without Google Sheets
+- **Two-stage architecture**: Generate Docs → Merge to PDF (or run separately)
+- **GradeBand subfolder organization**: Automatic folder creation and file organization
 - **Test mode**: Single class testing for quick validation
 
 ## Development Commands
@@ -108,24 +111,39 @@ git push origin main    # Push to GitHub (MANDATORY after every commit)
 
 ## Architecture
 
-### Simplified Structure (v2.0 - October 2025)
-**Focus**: Single-purpose template filling system - maximum simplicity, minimum complexity
+### Enhanced Structure (v2.1 - October 2025)
+**Focus**: Template filling + PDF merge by GradeBand + Direct execution
 
 **Code Metrics**:
-- Main script: 414 lines (optimized with improvements)
-- Functions: 10 functions (including test mode)
+- Main script: 1,376 lines (with PDF merge functionality)
+- Functions: 25+ functions (core + PDF merge + execution helpers)
 - Config-driven: All settings in single CONFIG object
-- Zero page formatting logic (template pre-configured)
-- Zero placeholder replacement (template has no placeholders on Page 1)
+- Template-based: Maintains copy-and-fill approach (no hardcoding)
+- Placeholder replacement: Full support for all exam metadata fields
+- Two-stage processing: Docs generation separate from PDF merge
 
 ### Core Data Flow
+
+**Stage 1: Document Generation**
 1. **Data Source**: Google Sheets with two worksheets:
    - `Students` sheet: Student records (ID, Home Room, Chinese Name, English Name, English Class)
-   - `Class` sheet: Class metadata (ClassName, Tea)
+   - `Class` sheet: Class metadata (ClassName, Teacher, GradeBand, Duration, Periods, etc.)
 
-2. **Processing**: Group students by English Class → Sort by ID (numeric) → Fill template table
+2. **Processing**:
+   - Sort classes by GradeBand → ClassName
+   - Group students by English Class → Sort by ID (numeric)
+   - Copy template → Replace placeholders → Fill student table
+   - Save to GradeBand subfolder
 
-3. **Output**: Google Docs files (one per class) saved to Drive folder
+3. **Output**: Individual Google Docs files (one per class) in GradeBand subfolders
+
+**Stage 2: PDF Merge (Optional)**
+1. **Input**: Google Docs files organized in GradeBand subfolders
+2. **Processing**:
+   - For each GradeBand subfolder
+   - Merge all Docs into single temporary Doc
+   - Export to PDF with GradeBand naming
+3. **Output**: One PDF per GradeBand (e.g., "G1 LT's_2526_Fall_Midterm.pdf")
 
 ### Project Structure (Google Apps Script)
 
@@ -147,34 +165,61 @@ Mid-Final Assessment Form-template/
 ### Script Files
 
 **主程式.js** - Main script (PRODUCTION - CURRENT)
-- **Purpose**: Generate 2526 Fall Midterm class reports
-- **Main function**: `generateClassReports()`
-- **Test function**: `testSingleClass()` - NEW: Test with single class
-- **Entry point**: Menu → "班級報告" → "生成 2526 Fall Midterm 報告" or "🧪 測試單一班級"
+- **Purpose**: Generate 2526 Fall Midterm class reports + PDF merge by GradeBand
+- **Main functions**:
+  - `generateClassReports()`: Stage 1 - Generate all Google Docs
+  - `mergeDocsToPDFByGradeBand()`: Stage 2 - Merge Docs to PDF by GradeBand
+  - `generateAndMergePDFReports()`: One-click execution (both stages)
+- **Apps Script Direct Execution** (NEW):
+  - `RUN_FULL_BATCH()`: Complete batch (Docs + PDF) - **Recommended**
+  - `RUN_DOCS_ONLY()`: Generate Docs only
+  - `RUN_PDF_ONLY()`: Merge PDFs only (requires Docs already generated)
+- **Test function**: `testSingleClass()` - Test with single class
+- **Entry points**:
+  - **Google Sheets Menu**: "班級報告" → Choose execution mode
+  - **Apps Script Editor**: Run `RUN_FULL_BATCH()` function directly
 - **Core Logic**:
   - Reads Students and Class sheets
   - Groups students by English Class
+  - Sorts classes by GradeBand → ClassName (alphabetically)
   - Sorts students by ID (numeric)
   - Copies template document
-  - Fills student table (tables[1]) with 6 columns
-  - Applies dynamic font sizing (9-11pt based on class size)
-  - Validates student count (warns if >21)
+  - Replaces all placeholders ({{GradeBand}}, {{Duration}}, etc.)
+  - Fills student table (tables[2]) with 6 columns
+  - Applies fixed font sizing (10pt for all content)
+  - Saves to GradeBand subfolder
+  - (Optional) Merges all Docs per GradeBand to single PDF
 - **Key functions**:
-  - `generateSingleReport()`: Creates individual class document
-  - `fillStudentTable()`: Core table filling logic (sort → locate → clear → fill → format)
-  - `formatTableRow()`: Unified cell formatting
-  - `calculateFontSize()`: Font sizing for 21-student max
-  - `testSingleClass()`: Test mode for first class only
+  - **Document Generation**:
+    - `generateSingleReport()`: Creates individual class document
+    - `replacePlaceholders()`: Replaces {{...}} with class data
+    - `fillStudentTable()`: Core table filling logic (sort → locate → fill → format)
+    - `formatTableRow()`: Unified cell formatting
+    - `getOrCreateSubfolder()`: GradeBand subfolder management
+  - **PDF Merge**:
+    - `sortClassDataByGradeBandAndName()`: Two-level class sorting
+    - `mergeDocsIntoPDF()`: Core merge logic (element-by-element copying)
+    - `formatMergeResults()`: Results formatting and reporting
+  - **Utilities**:
+    - `calculateFontSize()`: Returns fixed 10pt
+    - `getStudentIndexes()`, `getClassIndexes()`: Column mapping
+    - `groupStudentsByClass()`: Student grouping by English Class
 - **Configuration**: Single CONFIG object
   ```javascript
   const CONFIG = {
+    spreadsheetId: '1bo3xsXw0u8Wwbo6ALvPe9idKDVCjhtAVKAKfH8azhJE',  // For Apps Script execution
     templateId: '1D2hSZNI8MQzD_OIeCdEvpqp4EWfO2mrjTCHAQZyx6MM',
     outputFolderId: '1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi',
-    studentTableIndex: 1,  // Right-side student table
-    columnWidths: [90, 100, 140, 140, 80, 120],
-    fontSize: { large: 11, medium: 10, small: 9 },
-    semester: '2526_Fall_Midterm',
-    delayMs: 1000
+    studentTableIndex: 2,  // Third table (tables[2]) - student list table
+    columnWidths: [75, 75, 95, 100, 85, 155],  // Total: 585pt (~20.6cm)
+    fontSize: { large: 10, medium: 10, small: 10 },  // Fixed 10pt
+    semester: '2526_Fall_Midterm_v2',
+    delayMs: 1000,
+    placeholderFields: [
+      'GradeBand', 'Duration', 'Periods', 'Self-Study', 'Preparation',
+      'ExamTime', 'Level', 'Classroom', 'Proctor', 'Subject',
+      'ClassName', 'Teacher', 'Count', 'Students'
+    ]
   };
   ```
 
@@ -184,24 +229,39 @@ Mid-Final Assessment Form-template/
 - **Reports**: Page dimensions, table count/structure, placeholder presence, column widths
 - **Use when**: Template structure changes or debugging table access
 
-**輔助工具/轉檔.js** - PDF converter (HELPER TOOL)
-- **Purpose**: Batch convert generated docs to PDF
+**輔助工具/轉檔.js** - PDF converter (HELPER TOOL - LEGACY)
+- **Purpose**: Batch convert generated docs to PDF (individual files)
 - **Main function**: `batchDownloadDocsToPDF()`
 - **Features**: Duplicate checking, progress logging, rate limiting
 - **Folder ID**: `1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi` (same as output folder)
+- **Note**: For GradeBand-merged PDFs, use `mergeDocsToPDFByGradeBand()` in main script instead
 
 ### Common Patterns
 
 **Data Sheet Validation**
 All scripts check for required columns and throw errors if missing:
 - Students sheet: "English Class", "ID", "Home Room", "Chinese Name", "English Name"
-- Class sheet: "ClassName", "Tea"
+- Class sheet: "ClassName", "Teacher", "GradeBand", and all placeholder fields
 
-**Dynamic Font Sizing**
-Font sizes automatically adjust based on student count to fit content on page:
-- 19-21 students: 9pt (tight fit, ensures 2-page limit)
-- 13-18 students: 10pt (balanced)
-- 1-12 students: 11pt (comfortable reading)
+**Fixed Font Sizing (v2.1)**
+Font size is now fixed at 10pt for all content:
+- All student table content: 10pt
+- Headers: 10pt bold
+- Consistent formatting regardless of class size
+- Column widths optimized (585pt) to display headers without line breaks
+
+**Class Sorting (NEW)**
+Classes are sorted by two levels before processing:
+1. **GradeBand**: Primary sort (e.g., "G1 LT's", "G1 IT's", "G2 LT's")
+2. **ClassName**: Secondary sort (alphabetical within each GradeBand)
+- Ensures consistent ordering for PDF merge
+- Implemented in `sortClassDataByGradeBandAndName()`
+
+**GradeBand Subfolder Organization (NEW)**
+Files automatically organized by GradeBand:
+- Creates subfolder per GradeBand (e.g., "G1_LTs", "G2_ITs")
+- Folder naming: Sanitizes apostrophes and spaces for filesystem compatibility
+- Implemented in `getOrCreateSubfolder()`
 
 **Table Formatting**
 Consistent approach across all generators:
@@ -216,7 +276,21 @@ Best practices demonstrated:
 - Detailed console logging with progress indicators
 - User-friendly error messages
 - Graceful degradation (continues processing other classes on failure)
-- Student count validation (warns if >21)
+- Timeout prevention with strategic `Utilities.sleep()` calls
+
+**PDF Merge Architecture (NEW)**
+Element-by-element copying to preserve template formatting:
+1. Create temporary merged document
+2. For each class Doc:
+   - Open source document
+   - Copy all elements (paragraphs, tables, lists) using `.copy()`
+   - Append to merged document body
+   - Insert page break between classes
+3. Export merged Doc to PDF
+4. Delete temporary Doc
+- Maintains all template formatting and structure
+- No hardcoded content or dynamic structure creation
+- Strategic rest periods (every 5 docs, between GradeBands) to prevent timeout
 
 ### Menu Integration
 
@@ -225,11 +299,40 @@ Scripts include `onOpen()` function to add custom menu to Google Sheets:
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('班級報告')
-    .addItem('生成 2526 Fall Midterm 報告', 'runReportGeneration')
-    .addItem('🧪 測試單一班級', 'testSingleClass')
+    .addItem('步驟 1: 生成所有 Google Docs', 'runReportGeneration')
+    .addItem('步驟 2: 合併為 PDF（按 GradeBand）', 'runMergeDocsToPDF')
+    .addSeparator()
+    .addItem('🚀 一鍵執行（Docs + PDF）', 'runGenerateAndMergePDF')
+    .addSeparator()
+    .addItem('🧪 測試單一班級（v2）', 'testSingleClass')
     .addToUi();
 }
 ```
+
+### Execution Methods
+
+**Method 1: Google Sheets Menu** (User-friendly)
+1. Open Google Sheets with Students and Class data
+2. Click **班級報告** menu
+3. Choose execution mode:
+   - **🚀 一鍵執行（Docs + PDF）**: Full automated process (recommended)
+   - **步驟 1**: Generate Docs only (if you want to review before PDF merge)
+   - **步驟 2**: Merge PDFs only (after Docs generated)
+   - **🧪 測試**: Test with single class first
+
+**Method 2: Apps Script Editor Direct Execution** (Developer mode)
+1. Open Apps Script project: Extensions → Apps Script
+2. Select function from dropdown:
+   - **`RUN_FULL_BATCH()`**: Complete batch (Docs + PDF) - **Recommended**
+   - **`RUN_DOCS_ONLY()`**: Generate Docs only
+   - **`RUN_PDF_ONLY()`**: Merge PDFs only
+3. Click Run ▶
+4. Monitor console logs in real-time
+5. **Advantages**:
+   - No need to open Google Sheets
+   - Direct access to execution logs
+   - Faster for testing and debugging
+   - Can run from any Google account with script access
 
 ## Configuration
 
@@ -244,27 +347,57 @@ function onOpen() {
 ### Margins
 - Template default: Pre-configured in template document
 
-## Script Selection Guide
+## Usage Guide
 
-- **2526 Fall Midterm (Current)**: Use `主程式.js` (PRODUCTION - ONLY OPTION)
-  - Generates individual files per class
-  - Students sorted by ID automatically
-  - Fills template's existing 6-column table
-  - Run from Google Sheets menu: "班級報告" → "生成 2526 Fall Midterm 報告"
-  - **Test mode**: "🧪 測試單一班級" for quick validation
-- **PDF output**: First generate docs, then run `輔助工具/轉檔.js`
-- **Template debugging**: Use `輔助工具/分析模板.js` to inspect template structure
+### Quick Start (Recommended)
+**Apps Script Direct Execution** - Fastest method:
+1. Open Apps Script: Extensions → Apps Script
+2. Select `RUN_FULL_BATCH()` from function dropdown
+3. Click Run ▶
+4. Wait for completion (~10-15 minutes for 168 classes)
+5. Check output folder for GradeBand PDFs
+
+### Manual Two-Stage Process
+If you want to review Docs before PDF merge:
+1. **Stage 1**: Run `RUN_DOCS_ONLY()` or use Sheets menu "步驟 1"
+2. Review generated Docs in GradeBand subfolders
+3. **Stage 2**: Run `RUN_PDF_ONLY()` or use Sheets menu "步驟 2"
+
+### Testing
+Before full batch, test with single class:
+- **Google Sheets**: Menu → "🧪 測試單一班級（v2）"
+- Validates template filling logic with first class only
+- Shows detailed result with file link
+
+### Output Structure
+```
+Output Folder (CONFIG.outputFolderId)
+├── G1_LTs/
+│   ├── A1_TeacherName_2526_Fall_Midterm_v2_20251023_143052.docx
+│   ├── A2_TeacherName_2526_Fall_Midterm_v2_20251023_143055.docx
+│   └── G1 LT's_2526_Fall_Midterm.pdf  ← Merged PDF
+├── G1_ITs/
+│   └── G1 IT's_2526_Fall_Midterm.pdf
+└── G2_LTs/
+    └── G2 LT's_2526_Fall_Midterm.pdf
+```
+
+### Troubleshooting Tools
+- **Template debugging**: Run `輔助工具/分析模板.js` → `analyzeTemplateStructure()`
+- **Individual PDF conversion** (legacy): Run `輔助工具/轉檔.js` → `batchDownloadDocsToPDF()`
 
 ## Important Implementation Details (2526 Fall Midterm)
 
 ### Template Structure
-**Page 1**: Exam proctoring guidelines (fixed content, NO placeholders)
+**Page 1**: Exam proctoring guidelines with placeholders
 - Title: "SY25-26 ID Midterm & Final Exam Proctoring Guidelines"
-- Content remains unchanged in generated reports
+- Contains 14 placeholders: {{GradeBand}}, {{Duration}}, {{Periods}}, etc.
+- All placeholders replaced with class-specific data using `replacePlaceholders()`
 
-**Page 2**: Two tables side-by-side
-- Left table (tables[0]): Class information (not modified by script)
-- Right table (tables[1]): Student list - **THIS IS WHAT GETS FILLED**
+**Page 2**: Three tables
+- First table (tables[0]): Exam information header
+- Second table (tables[1]): Class information (left side)
+- Third table (tables[2]): Student list (right side) - **THIS IS WHAT GETS FILLED**
 
 ### Student Sorting
 Students are automatically sorted by ID number (numeric sort) before filling the table:
@@ -276,64 +409,102 @@ const sortedStudents = students.slice().sort((a, b) => {
 });
 ```
 
-### Student Count Validation
-Script validates student count and warns if exceeding template capacity:
+### Placeholder Replacement (NEW in v2)
+All 14 placeholders on Page 1 are replaced with class-specific data:
 ```javascript
-if (sortedStudents.length > 21) {
-  console.warn(`⚠️ 警告: 學生人數 ${sortedStudents.length} 超過 21 人，可能超過 2 頁限制`);
+function replacePlaceholders(body, classData) {
+  CONFIG.placeholderFields.forEach(field => {
+    const placeholder = `{{${field}}}`;
+    const value = String(classData[field] || '');
+    body.replaceText(placeholder, value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  });
 }
 ```
+- **Regex escaping**: Special characters properly escaped to prevent regex errors
+- **Empty handling**: Missing data replaced with empty string (no "undefined")
+- **Example replacements**: {{GradeBand}} → "G1 LT's", {{Duration}} → "50 mins", {{Periods}} → "3-4"
 
 ### Template Table Filling (Not Creating New Tables)
-The script locates and fills the existing table in the template (tables[1]):
-1. **Locate**: Access 2nd table (index 1) in document body
-2. **Clear**: Remove all rows except header row
-3. **Fill**: Append new rows for each sorted student
-4. **Format**: Apply font sizing, alignment, borders
-5. **Set widths**: Apply column widths [90, 100, 140, 140, 80, 120]
+The script locates and fills the existing table in the template (tables[2]):
+1. **Locate**: Access 3rd table (index 2) in document body
+2. **Fill**: Overwrite existing rows with student data (Solution C approach)
+3. **Format**: Apply fixed 10pt font, alignment, borders
+4. **Set widths**: Apply column widths [75, 75, 95, 100, 85, 155] = 585pt total
 
 **6 Columns**:
 | Column | Field | Width | Notes |
 |--------|-------|-------|-------|
-| 0 | Student ID | 90pt | From Students sheet |
-| 1 | Homeroom | 100pt | From Students sheet |
-| 2 | Chinese Name | 140pt | From Students sheet |
-| 3 | English Name | 140pt | From Students sheet |
-| 4 | Present | 80pt | Checkbox ☐ (static) |
-| 5 | Signed Paper Returned | 120pt | Checkbox ☐ (static) |
+| 0 | Student ID | 75pt | From Students sheet |
+| 1 | Homeroom | 75pt | From Students sheet |
+| 2 | Chinese Name | 95pt | From Students sheet |
+| 3 | English Name | 100pt | From Students sheet |
+| 4 | Present | 85pt | Checkbox ☐ (static) |
+| 5 | Signed Paper Returned | 155pt | Checkbox ☐ (static) |
 
-### Font Size Logic (Max 21 Students)
-Dynamic sizing ensures content fits within 2-page limit:
-- **19-21 students**: 9pt (tight fit)
-- **13-18 students**: 10pt (balanced)
-- **1-12 students**: 11pt (comfortable reading)
+**Total width**: 585pt (~20.6cm) - optimized to fit A4 landscape with headers displaying fully
 
-### File Naming Convention
-Format: `{ClassName}_{TeacherName}_2526_Fall_Midterm_{timestamp}`
-- Timestamp format: `yyyyMMdd_HHmmss` (includes seconds to prevent overwrite)
-- Example: `A1_TeacherName_2526_Fall_Midterm_20251015_143052`
+### Font Size Logic (Fixed 10pt)
+Font size is now fixed regardless of student count:
+- **All students**: 10pt (consistent formatting)
+- **Headers**: 10pt bold
+- **Column widths optimized**: Headers display without line breaks at 10pt
+
+### File Naming Conventions
+
+**Individual Docs**:
+- Format: `{ClassName}_{TeacherName}_2526_Fall_Midterm_v2_{timestamp}`
+- Timestamp: `yyyyMMdd_HHmmss` (includes seconds to prevent overwrite)
+- Example: `A1_JohnDoe_2526_Fall_Midterm_v2_20251023_143052`
+- Saved to: `{OutputFolder}/{GradeBand_Sanitized}/`
+
+**Merged PDFs**:
+- Format: `{GradeBand}_2526_Fall_Midterm.pdf`
+- GradeBand preserved with original formatting (apostrophes restored)
+- Example: `G1 LT's_2526_Fall_Midterm.pdf`
+- Saved to: `{OutputFolder}/{GradeBand_Sanitized}/`
+
+### GradeBand Folder Naming
+- **Sanitization**: Apostrophes and spaces replaced for filesystem compatibility
+- **Examples**:
+  - "G1 LT's" → Folder: "G1_LTs", PDF: "G1 LT's_2526_Fall_Midterm.pdf"
+  - "G2 IT's" → Folder: "G2_ITs", PDF: "G2 IT's_2526_Fall_Midterm.pdf"
+- **Reverse mapping**: Folder names converted back to original format for PDF naming
 
 ### Progress Tracking
-Console logs show progress during batch processing:
+Console logs show detailed progress during batch processing:
 ```javascript
-const progress = Math.round((i / (classData.length - 1)) * 100);
-console.log(`處理 ${classInfo.name}... [${i}/${classData.length - 1}] (${progress}%)`);
+// Document generation
+const progress = Math.round((i / sortedClassList.length) * 100);
+console.log(`處理 ${classInfo.ClassName}... [${i + 1}/${sortedClassList.length}] (${progress}%)`);
+
+// PDF merge
+console.log(`處理 GradeBand ${folderIndex + 1}/${subfoldersArray.length}: ${gradeBandFolderName}`);
+console.log(`  合併 ${docsList.length} 個文件為 PDF...`);
 ```
 
-### Test Mode (NEW in v2.0)
+### Execution Time Estimates
+Based on 168 classes across 6 GradeBands:
+- **Docs generation only**: ~8-10 minutes
+- **PDF merge only**: ~2-3 minutes
+- **Full batch (Docs + PDF)**: ~10-15 minutes
+- **Test mode (single class)**: ~5-10 seconds
+
+### Test Mode
 Use `testSingleClass()` to test with first class only:
-- Faster testing without generating all reports
-- Validates template filling logic
+- Faster testing without generating all reports (~5-10 seconds)
+- Validates template filling logic and placeholder replacement
 - Shows detailed result message with file link
-- Access via menu: "🧪 測試單一班級"
+- Access via menu: "🧪 測試單一班級（v2）"
 
 ## Known Limitations
 
-- Apps Script execution time limit: 6 minutes for custom functions
+- Apps Script execution time limit: 6 minutes for custom functions (mitigated by strategic sleep() calls)
 - Rate limiting required for batch operations (1-second delay between files)
 - Hard-coded resource IDs require manual updates for different environments
-- Maximum 21 students per class (template constraint)
+- Template capacity: Optimized for reasonable class sizes with fixed 10pt font
 - Google Apps Script flat file structure (cannot organize into src/ folders)
+- PDF merge creates temporary Docs (automatically deleted after export)
+- Large batches (>200 classes) may require splitting into multiple runs
 
 ## Timezone
 
