@@ -88,34 +88,17 @@ function generateClassReports() {
     const classIndexes = getClassIndexes(classData[0]);
     const groupedStudents = groupStudentsByClass(studentsData, studentIndexes);
 
-    console.log(`開始處理 ${classData.length - 1} 個班級...`);
+    // 排序班級：先按 GradeBand，再按 ClassName 字母順序
+    const sortedClassList = sortClassDataByGradeBandAndName(classData, classIndexes);
+
+    console.log(`開始處理 ${sortedClassList.length} 個班級（已按 GradeBand 和 ClassName 排序）...`);
 
     // 生成報告
     const results = [];
     const errors = [];
 
-    for (let i = 1; i < classData.length; i++) {
-      // 建立完整的班級資料物件（包含所有新欄位）
-      const classRow = classData[i];
-      const classInfo = {
-        ClassName: classRow[classIndexes.ClassName],
-        Grade: classRow[classIndexes.Grade],
-        Teacher: classRow[classIndexes.Teacher],
-        Level: classRow[classIndexes.Level],
-        Classroom: classRow[classIndexes.Classroom],
-        GradeBand: classRow[classIndexes.GradeBand],
-        Duration: classRow[classIndexes.Duration],
-        Periods: classRow[classIndexes.Periods],
-        'Self-Study': classRow[classIndexes['Self-Study']],
-        Preparation: classRow[classIndexes.Preparation],
-        ExamTime: classRow[classIndexes.ExamTime],
-        Proctor: classRow[classIndexes.Proctor],
-        Subject: classRow[classIndexes.Subject],
-        Count: classRow[classIndexes.Count],
-        Students: classRow[classIndexes.Students]
-      };
-
-      if (!classInfo.ClassName) continue;
+    for (let i = 0; i < sortedClassList.length; i++) {
+      const classInfo = sortedClassList[i];
 
       const students = groupedStudents[classInfo.ClassName];
       if (!students || students.length === 0) {
@@ -125,8 +108,8 @@ function generateClassReports() {
       }
 
       try {
-        const progress = Math.round((i / (classData.length - 1)) * 100);
-        console.log(`處理 ${classInfo.ClassName} (${classInfo.Teacher})... [${i}/${classData.length - 1}] (${progress}%)`);
+        const progress = Math.round(((i + 1) / sortedClassList.length) * 100);
+        console.log(`處理 ${classInfo.ClassName} (${classInfo.Teacher})... [${i + 1}/${sortedClassList.length}] (${progress}%)`);
 
         const file = generateSingleReport(classInfo, students, studentIndexes);
         results.push({
@@ -137,7 +120,7 @@ function generateClassReports() {
         });
 
         // 延遲避免 API 限制
-        if (i < classData.length - 1) {
+        if (i < sortedClassList.length - 1) {
           Utilities.sleep(CONFIG.delayMs);
         }
 
@@ -572,17 +555,47 @@ function formatResults(results, errors) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('班級報告')
-    .addItem('生成 2526 Fall Midterm v2 報告', 'runReportGeneration')
+    .addItem('步驟 1: 生成所有 Google Docs', 'runReportGeneration')
+    .addItem('步驟 2: 合併為 PDF（按 GradeBand）', 'runMergeDocsToPDF')
+    .addSeparator()
+    .addItem('🚀 一鍵執行（Docs + PDF）', 'runGenerateAndMergePDF')
+    .addSeparator()
     .addItem('🧪 測試單一班級（v2）', 'testSingleClass')
     .addToUi();
 }
 
 /**
- * 從選單執行
+ * 從選單執行 - 生成所有 Google Docs
  */
 function runReportGeneration() {
   try {
     const result = generateClassReports();
+    SpreadsheetApp.getUi().alert(result);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert(`❌ 執行失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
+    console.error('執行錯誤:', e);
+  }
+}
+
+/**
+ * 從選單執行 - 合併 Docs 為 PDF（按 GradeBand）
+ */
+function runMergeDocsToPDF() {
+  try {
+    const result = mergeDocsToPDFByGradeBand();
+    SpreadsheetApp.getUi().alert(result);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert(`❌ 執行失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
+    console.error('執行錯誤:', e);
+  }
+}
+
+/**
+ * 從選單執行 - 一鍵執行（生成 Docs + 合併 PDF）
+ */
+function runGenerateAndMergePDF() {
+  try {
+    const result = generateAndMergePDFReports();
     SpreadsheetApp.getUi().alert(result);
   } catch (e) {
     SpreadsheetApp.getUi().alert(`❌ 執行失敗: ${e.message}\n\n請檢查日誌獲取詳細資訊`);
@@ -858,6 +871,331 @@ function RUN() {
     console.error(`錯誤訊息: ${e.message}`);
     console.error(`錯誤堆疊: ${e.stack}`);
     console.error('========================================');
+    throw e;
+  }
+}
+
+// ============================================
+// PDF 合併功能（按 GradeBand 分組）
+// ============================================
+
+/**
+ * 按 GradeBand 和 ClassName 排序班級資料
+ * @param {Array} classData - 原始班級資料陣列（包含標題行）
+ * @param {Object} classIndexes - 班級欄位索引
+ * @return {Array} 排序後的班級資料物件陣列
+ */
+function sortClassDataByGradeBandAndName(classData, classIndexes) {
+  // 1. 提取所有班級資料（跳過標題行）
+  const classList = [];
+  for (let i = 1; i < classData.length; i++) {
+    const classRow = classData[i];
+    if (!classRow[classIndexes.ClassName]) continue;
+
+    classList.push({
+      ClassName: classRow[classIndexes.ClassName],
+      Grade: classRow[classIndexes.Grade],
+      Teacher: classRow[classIndexes.Teacher],
+      Level: classRow[classIndexes.Level],
+      Classroom: classRow[classIndexes.Classroom],
+      GradeBand: classRow[classIndexes.GradeBand],
+      Duration: classRow[classIndexes.Duration],
+      Periods: classRow[classIndexes.Periods],
+      'Self-Study': classRow[classIndexes['Self-Study']],
+      Preparation: classRow[classIndexes.Preparation],
+      ExamTime: classRow[classIndexes.ExamTime],
+      Proctor: classRow[classIndexes.Proctor],
+      Subject: classRow[classIndexes.Subject],
+      Count: classRow[classIndexes.Count],
+      Students: classRow[classIndexes.Students]
+    });
+  }
+
+  // 2. 排序：先按 GradeBand，再按 ClassName 字母順序
+  classList.sort((a, b) => {
+    // 先比較 GradeBand
+    const gradeBandCompare = a.GradeBand.localeCompare(b.GradeBand);
+    if (gradeBandCompare !== 0) return gradeBandCompare;
+
+    // GradeBand 相同，再比較 ClassName 字母順序
+    return a.ClassName.localeCompare(b.ClassName);
+  });
+
+  console.log(`班級已排序：先按 GradeBand，再按 ClassName 字母順序`);
+  return classList;
+}
+
+/**
+ * 將多個 Google Docs 合併為單一 PDF
+ * @param {Array} docsList - Google Docs File 物件陣列
+ * @param {String} gradeBandName - GradeBand 名稱（資料夾名稱，例如 "G1_LTs"）
+ * @param {String} originalGradeBand - 原始 GradeBand 名稱（例如 "G1 LT's"）
+ * @param {Folder} targetFolder - 目標資料夾物件
+ * @return {File} 生成的 PDF File 物件
+ */
+function mergeDocsIntoPDF(docsList, gradeBandName, originalGradeBand, targetFolder) {
+  console.log(`  開始合併 ${docsList.length} 個文件...`);
+
+  // 1. 創建臨時合併文件
+  const mergedDoc = DocumentApp.create(`${gradeBandName}_Merged_Temp`);
+  const mergedBody = mergedDoc.getBody();
+
+  // 2. 清空預設內容
+  mergedBody.clear();
+
+  // 3. 遍歷每個 Docs，複製內容
+  docsList.forEach((file, index) => {
+    console.log(`    複製 ${index + 1}/${docsList.length}: ${file.getName()}`);
+
+    try {
+      // 3a. 開啟來源文件
+      const sourceDoc = DocumentApp.openById(file.getId());
+      const sourceBody = sourceDoc.getBody();
+
+      // 3b. 複製所有元素到合併文件
+      const numElements = sourceBody.getNumChildren();
+      for (let i = 0; i < numElements; i++) {
+        const element = sourceBody.getChild(i);
+        const elementType = element.getType();
+
+        // 複製不同類型的元素
+        if (elementType === DocumentApp.ElementType.PARAGRAPH) {
+          const para = element.asParagraph().copy();
+          mergedBody.appendParagraph(para);
+        } else if (elementType === DocumentApp.ElementType.TABLE) {
+          const table = element.asTable().copy();
+          mergedBody.appendTable(table);
+        } else if (elementType === DocumentApp.ElementType.LIST_ITEM) {
+          const listItem = element.asListItem().copy();
+          mergedBody.appendListItem(listItem);
+        } else if (elementType === DocumentApp.ElementType.PAGE_BREAK) {
+          // 跳過原有的分頁符號，稍後統一插入
+          continue;
+        }
+        // 其他元素類型可以擴充
+      }
+
+      // 3c. 插入分頁符號（除了最後一個文件）
+      if (index < docsList.length - 1) {
+        mergedBody.appendPageBreak();
+      }
+
+      // 3d. 每複製 5 個文件休息 1 秒，避免超時
+      if ((index + 1) % 5 === 0) {
+        Utilities.sleep(1000);
+      }
+
+    } catch (e) {
+      console.error(`    ⚠️ 複製 ${file.getName()} 時發生錯誤: ${e.message}`);
+      // 繼續處理下一個文件
+    }
+  });
+
+  // 4. 儲存並關閉臨時文件
+  mergedDoc.saveAndClose();
+  console.log(`  文件合併完成，開始匯出 PDF...`);
+
+  // 5. 匯出為 PDF
+  const mergedDocFile = DriveApp.getFileById(mergedDoc.getId());
+  const pdfBlob = mergedDocFile.getAs(MimeType.PDF);
+
+  // 6. 設定 PDF 檔名（使用原始 GradeBand 名稱，保留撇號等特殊字元）
+  const pdfFileName = `${originalGradeBand}_2526_Fall_Midterm.pdf`;
+  pdfBlob.setName(pdfFileName);
+
+  // 7. 儲存 PDF 到目標資料夾
+  const pdfFile = targetFolder.createFile(pdfBlob);
+  console.log(`  ✅ PDF 已儲存: ${pdfFileName}`);
+
+  // 8. 刪除臨時 Docs
+  mergedDocFile.setTrashed(true);
+
+  return pdfFile;
+}
+
+/**
+ * 按 GradeBand 將 Google Docs 合併為 PDF
+ * 讀取輸出資料夾中的所有 GradeBand 子資料夾，將每個子資料夾中的 Docs 合併為單一 PDF
+ */
+function mergeDocsToPDFByGradeBand() {
+  try {
+    console.log('========================================');
+    console.log('📄 按 GradeBand 合併為 PDF');
+    console.log('========================================');
+
+    // 1. 取得輸出資料夾
+    const parentFolder = DriveApp.getFolderById(CONFIG.outputFolderId);
+    console.log(`輸出資料夾: ${parentFolder.getName()}`);
+    console.log('');
+
+    // 2. 遍歷所有 GradeBand 子資料夾
+    const subfolders = parentFolder.getFolders();
+    const results = [];
+    const errors = [];
+
+    // 先統計總數
+    const subfoldersArray = [];
+    while (subfolders.hasNext()) {
+      subfoldersArray.push(subfolders.next());
+    }
+
+    console.log(`找到 ${subfoldersArray.length} 個 GradeBand 子資料夾`);
+    console.log('');
+
+    // 3. 處理每個子資料夾
+    subfoldersArray.forEach((subfolder, folderIndex) => {
+      const gradeBandFolderName = subfolder.getName();  // 例如 "G1_LTs"
+
+      try {
+        console.log(`[${folderIndex + 1}/${subfoldersArray.length}] 處理 ${gradeBandFolderName}...`);
+
+        // 3a. 取得該子資料夾中所有 Google Docs（排除 PDF）
+        const allFiles = subfolder.getFiles();
+        const docsList = [];
+
+        while (allFiles.hasNext()) {
+          const file = allFiles.next();
+          if (file.getMimeType() === MimeType.GOOGLE_DOCS) {
+            docsList.push(file);
+          }
+        }
+
+        if (docsList.length === 0) {
+          console.warn(`  ⚠️ ${gradeBandFolderName} 沒有 Google Docs 檔案，跳過`);
+          errors.push(`${gradeBandFolderName} (無檔案)`);
+          return;
+        }
+
+        console.log(`  找到 ${docsList.length} 個班級文件`);
+
+        // 3b. 按檔名字母順序排序
+        // 檔名格式：ClassName_Teacher_2526_Fall_Midterm_v2_timestamp
+        // 排序會自動依 ClassName 排序（因為 ClassName 在檔名開頭）
+        docsList.sort((a, b) => {
+          return a.getName().localeCompare(b.getName());
+        });
+
+        console.log(`  文件已按檔名字母順序排序`);
+
+        // 3c. 反推原始 GradeBand 名稱（從資料夾名稱轉回）
+        // 例如 "G1_LTs" → "G1 LT's"
+        const originalGradeBand = gradeBandFolderName
+          .replace(/_/g, ' ')  // 底線 → 空格
+          .replace(/LTs/g, "LT's")  // 特殊處理：LTs → LT's
+          .replace(/ITs/g, "IT's"); // 特殊處理：ITs → IT's
+
+        // 3d. 合併所有 Docs 為單一 PDF
+        const pdfFile = mergeDocsIntoPDF(docsList, gradeBandFolderName, originalGradeBand, subfolder);
+
+        results.push({
+          gradeBand: originalGradeBand,
+          folderName: gradeBandFolderName,
+          classCount: docsList.length,
+          pdfUrl: pdfFile.getUrl(),
+          pdfName: pdfFile.getName()
+        });
+
+        console.log(`✅ ${gradeBandFolderName} 完成 (${docsList.length} 個班級)`);
+
+      } catch (e) {
+        console.error(`❌ ${gradeBandFolderName} 處理失敗: ${e.message}`);
+        errors.push(`${gradeBandFolderName} (${e.message})`);
+      }
+
+      // 3e. 每完成一個 GradeBand，休息 2 秒避免超時
+      console.log(`  休息 2 秒...\n`);
+      Utilities.sleep(2000);
+    });
+
+    // 4. 生成結果報告
+    return formatMergeResults(results, errors);
+
+  } catch (e) {
+    console.error(`執行失敗: ${e.message}`);
+    throw e;
+  }
+}
+
+/**
+ * 格式化合併結果報告
+ */
+function formatMergeResults(results, errors) {
+  let message = `✅ PDF 合併完成！\n\n`;
+  message += `📊 成功: ${results.length} 個 GradeBand\n`;
+
+  if (errors.length > 0) {
+    message += `❌ 失敗: ${errors.length} 個 GradeBand\n`;
+  }
+
+  if (results.length > 0) {
+    message += `\n📁 生成的 PDF 檔案：\n`;
+
+    results.forEach(item => {
+      message += `\n  📂 ${item.gradeBand} (${item.folderName}):\n`;
+      message += `    • ${item.pdfName}\n`;
+      message += `    • 包含 ${item.classCount} 個班級\n`;
+    });
+
+    message += `\n🔗 主資料夾: https://drive.google.com/drive/folders/${CONFIG.outputFolderId}`;
+  }
+
+  if (errors.length > 0) {
+    message += `\n\n⚠️ 失敗的 GradeBand：\n`;
+    errors.forEach((err, i) => {
+      message += `${i + 1}. ${err}\n`;
+    });
+  }
+
+  return message;
+}
+
+/**
+ * 主函數：生成所有班級的 Google Docs 並合併為 PDF（按 GradeBand）
+ * 自動執行兩階段流程：
+ * 1. 生成所有獨立的 Google Docs 檔案
+ * 2. 按 GradeBand 合併為 PDF
+ */
+function generateAndMergePDFReports() {
+  try {
+    console.log('========================================');
+    console.log('🚀 自動兩階段執行');
+    console.log('========================================\n');
+
+    // 階段 1: 生成所有 Google Docs
+    console.log('========================================');
+    console.log('階段 1: 生成所有班級的 Google Docs 檔案');
+    console.log('========================================');
+
+    const docsResult = generateClassReports();
+    console.log(docsResult);
+
+    console.log('');
+    console.log('✅ 階段 1 完成，休息 5 秒後繼續...');
+    console.log('');
+    Utilities.sleep(5000);
+
+    // 階段 2: 合併為 PDF
+    console.log('========================================');
+    console.log('階段 2: 按 GradeBand 合併為 PDF');
+    console.log('========================================');
+
+    const pdfResult = mergeDocsToPDFByGradeBand();
+    console.log(pdfResult);
+
+    // 最終報告
+    const finalReport = `✅ 全部完成！
+
+【階段 1: Google Docs 生成】
+${docsResult}
+
+【階段 2: PDF 合併】
+${pdfResult}
+`;
+
+    return finalReport;
+
+  } catch (e) {
+    console.error(`執行失敗: ${e.message}`);
     throw e;
   }
 }
