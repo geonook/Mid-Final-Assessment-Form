@@ -25,7 +25,9 @@ const CONFIG = {
 
   // 表格設定
   studentTableIndex: 2,  // 學生名單表格（第三個表格，tables[2]）
-  columnWidths: [90, 100, 140, 140, 80, 120],  // 6 欄寬度
+  columnWidths: [48, 48, 55, 75, 50, 74],  // 6 欄寬度（總計 350pt ≈ 12.3cm，適應右欄版面）
+  // [Student ID, Homeroom, Chinese Name, English Name, Present, Signed Paper]
+  // 每欄約 1.7-2.6cm（標題可在模板中使用換行縮減寬度）
 
   // 字體大小設定（根據學生人數）
   fontSize: {
