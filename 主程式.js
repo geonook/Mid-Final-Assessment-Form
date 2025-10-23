@@ -1118,6 +1118,26 @@ function mergeDocsIntoPDF(docsList, gradeBandName, originalGradeBand, targetFold
   // 2. 清空預設內容
   mergedBody.clear();
 
+  // 2a. 複製第一個文件的頁面設定（確保 A4 橫式）
+  if (docsList.length > 0) {
+    try {
+      const firstDoc = DocumentApp.openById(docsList[0].getId());
+      const firstBody = firstDoc.getBody();
+
+      // 複製頁面尺寸和邊距
+      mergedBody.setPageWidth(firstBody.getPageWidth());
+      mergedBody.setPageHeight(firstBody.getPageHeight());
+      mergedBody.setMarginTop(firstBody.getMarginTop());
+      mergedBody.setMarginBottom(firstBody.getMarginBottom());
+      mergedBody.setMarginLeft(firstBody.getMarginLeft());
+      mergedBody.setMarginRight(firstBody.getMarginRight());
+
+      console.log(`  頁面設定: ${firstBody.getPageWidth()} x ${firstBody.getPageHeight()} pt (寬 x 高)`);
+    } catch (e) {
+      console.warn(`  ⚠️ 無法複製頁面設定: ${e.message}，使用預設設定`);
+    }
+  }
+
   // 3. 遍歷每個 Docs，複製內容
   docsList.forEach((file, index) => {
     console.log(`    複製 ${index + 1}/${docsList.length}: ${file.getName()}`);
