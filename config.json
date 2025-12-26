@@ -1,0 +1,14 @@
+{
+  "spreadsheetId": "1bo3xsXw0u8Wwbo6ALvPe9idKDVCjhtAVKAKfH8azhJE",
+  "templateId": "1D2hSZNI8MQzD_OIeCdEvpqp4EWfO2mrjTCHAQZyx6MM",
+  "outputFolderId": "1KSyHsy1wUcrT82OjkAMmPFaJmwe-uosi",
+  "semester": "2526_Fall_Midterm_v2",
+  "studentTableIndex": 2,
+  "columnWidths": [75, 75, 95, 100, 85, 155],
+  "fontSize": {
+    "large": 10,
+    "medium": 10,
+    "small": 10
+  },
+  "delayMs": 1000
+}

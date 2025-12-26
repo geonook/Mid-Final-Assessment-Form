@@ -49,8 +49,14 @@ temp/
 # Output/Generated files
 output/
 *.csv
-*.json
 *.xlsx
+
+# JSON files (except project config)
+*.json
+!config.json
+!schema.json
+!appsscript.json
+!.clasp.json
 
 # Documentation drafts (keep final versions)
 *_draft.md

@@ -1,0 +1,61 @@
+{
+  "students": {
+    "sheetName": "Students",
+    "requiredFields": [
+      "English Class",
+      "ID",
+      "Home Room",
+      "Chinese Name",
+      "English Name"
+    ],
+    "sortBy": "ID",
+    "groupBy": "English Class"
+  },
+  "class": {
+    "sheetName": "Class",
+    "requiredFields": [
+      "ClassName",
+      "Grade",
+      "Teacher",
+      "Level",
+      "Classroom",
+      "GradeBand",
+      "Duration",
+      "Periods",
+      "Self-Study",
+      "Preparation",
+      "ExamTime",
+      "Proctor",
+      "Subject",
+      "Count",
+      "Students"
+    ],
+    "placeholderFields": [
+      "GradeBand",
+      "Duration",
+      "Periods",
+      "Self-Study",
+      "Preparation",
+      "ExamTime",
+      "Level",
+      "Classroom",
+      "Proctor",
+      "Subject",
+      "ClassName",
+      "Teacher",
+      "Count",
+      "Students"
+    ],
+    "sortBy": ["GradeBand", "ClassName"]
+  },
+  "output": {
+    "tableColumns": [
+      { "field": "ID", "header": "Student ID", "width": 75 },
+      { "field": "Home Room", "header": "Homeroom", "width": 75 },
+      { "field": "Chinese Name", "header": "Chinese Name", "width": 95 },
+      { "field": "English Name", "header": "English Name", "width": 100 },
+      { "field": null, "header": "Present", "width": 85, "default": "☐" },
+      { "field": null, "header": "Signed Paper Returned", "width": 155, "default": "☐" }
+    ]
+  }
+}
